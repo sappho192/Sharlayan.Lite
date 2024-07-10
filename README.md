@@ -1,12 +1,6 @@
 # sharlayan
 
-Issue tracking, feature request and release repository.
-
-# What is this?
-
-This is the main memory module for FFXIVAPP split out into it's own repo. For enterprising people this means not having to wait for a full app update as this "should" be a drop in replacement for your existing one in your FFXIVAPP folder.
-
-Pending anything catastrophic update-wise it should be good to go.
+This fork is a lightweight version of the original library and only has ChatLog functionality.
 
 # How do I use it and what comes back?
 
@@ -62,43 +56,6 @@ MemoryHandler memoryHandler = SharlayanMemoryManager.Instance.GetHandler(process
 XResult result = memoryHandler.Reader.GetX();
 ```
 
-## Actors (Monster, Player, NPC, etc) Reading
-
-```csharp
-using Sharlayan;
-
-ActorReadResult readResult = memoryHandler.Reader.GetActors();
-
-// Removed is list of ID's that were in the last scan
-// New is all the new ID's added
-// Also returned is the Current list of actors.
-
-// The result is the following class
-public class ActorReadResult
-{
-    public ActorReadResult()
-    {
-        RemovedMonster = new Dictionary<uint, uint>();
-        RemovedNPC = new Dictionary<uint, uint>();
-        RemovedPC = new Dictionary<uint, uint>();
-
-        NewMonster = new List<uint>();
-        NewNPC = new List<uint>();
-        NewPC = new List<uint>();
-    }
-
-    public ConcurrentDictionary<uint, ActorItem> MonsterEntities => MonsterWorkerDelegate.EntitiesDictionary;
-    public ConcurrentDictionary<uint, ActorItem> NPCEntities => NPCWorkerDelegate.EntitiesDictionary;
-    public ConcurrentDictionary<uint, ActorItem> PCEntities => PCWorkerDelegate.EntitiesDictionary;
-    public Dictionary<uint, uint> RemovedMonster { get; set; }
-    public Dictionary<uint, uint> RemovedNPC { get; set; }
-    public Dictionary<uint, uint> RemovedPC { get; set; }
-    public List<UInt32> NewMonster { get; set; }
-    public List<UInt32> NewNPC { get; set; }
-    public List<UInt32> NewPC { get; set; }
-}
-```
-
 ## ChatLog Reading
 
 ```csharp
@@ -126,93 +83,6 @@ public class ChatLogReadResult
     public List<ChatLogEntry> ChatLogEntries { get; set; }
     public int PreviousArrayIndex { get; set; }
     public int PreviousOffset { get; set; }
-}
-```
-
-## Inventory Reading
-
-```csharp
-using Sharlayan;
-
-InventoryReadResult readResult = memoryHandler.Reader.GetInventoryItems();
-
-// The result is the following class
-public class InventoryReadResult
-{
-    public InventoryReadResult()
-    {
-        InventoryEntities = new List<InventoryEntity>();
-    }
-
-    public List<InventoryEntity> InventoryEntities { get; set; }
-}
-```
-
-## Party Reading
-
-```csharp
-using Sharlayan;
-
-PartyInfoReadResult readResult = memoryHandler.Reader.GetPartyMembers();
-
-// Removed is list of ID's that were in the last scan
-// New is all the new ID's added
-// Also returned is the Current list of actors.
-
-// The result is the following class
-public class PartyInfoReadResult
-{
-    public PartyInfoReadResult()
-    {
-        RemovedParty = new Dictionary<uint, uint>();
-
-        NewParty = new List<uint>();
-    }
-
-    public ConcurrentDictionary<uint, PartyMember> PartyEntities => PartyInfoWorkerDelegate.EntitiesDictionary;
-    public Dictionary<uint, uint> RemovedParty { get; set; }
-    public List<UInt32> NewParty { get; set; }
-}
-```
-
-## Player Info Reading
-
-```csharp
-using Sharlayan;
-
-PlayerInfoReadResult readResult = memoryHandler.Reader.GetPlayerInfo();
-
-// The result is the following class
-public class PlayerInfoReadResult
-{
-    public PlayerInfoReadResult()
-    {
-        CurrentPlayer = new CurrentPlayer();
-    }
-
-    public CurrentPlayer CurrentPlayer { get; set; }
-}
-```
-
-## Target Reading
-
-```csharp
-using Sharlayan;
-
-TargetReadResult readResult = memoryHandler.Reader.GetTargetInfo();
-
-// TargetsFound means at least 1 was found
-
-// The result is the following class
-public class TargetReadResult
-{
-    public TargetReadResult()
-    {
-        TargetEntity = new TargetEntity();
-    }
-
-    public TargetEntity TargetEntity { get; set; }
-    public bool TargetsFound { get; set; }
 }
 ```
 
