@@ -3,9 +3,9 @@
 		<TargetFrameworks>net462;net48;net6.0;net7.0;net8.0</TargetFrameworks>
 		<IncludeSymbols>true</IncludeSymbols>
 		<IncludeSource>true</IncludeSource>
-		<Authors>Ryan Wilson</Authors>
+		<Authors>Ryan Wilson, Taein Kim</Authors>
 		<PackageLicenseUrl></PackageLicenseUrl>
-		<PackageProjectUrl>https://github.com/FFXIVAPP/sharlayan</PackageProjectUrl>
+		<PackageProjectUrl>https://github.com/sappho192/sharlayan</PackageProjectUrl>
 		<PackageIconUrl></PackageIconUrl>
 		<RepositoryUrl></RepositoryUrl>
 		<PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
@@ -13,14 +13,13 @@
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
 		<Version>8.0.0</Version>
 		<Company>SyndicatedLife</Company>
-		<Product>Sharlayan</Product>
-		<Description>Final Fantasy XIV Memory Reading</Description>
-		<Copyright>Copyright © 2007 - 2022 Ryan Wilson</Copyright>
+		<Product>Sharlayan.Lite</Product>
+		<Description>This fork is a lightweight version of the original library and only has ChatLog functionality.</Description>
+		<Copyright>Copyright © 2007 - 2024 Ryan Wilson</Copyright>
 		<FileVersion>8.0.0.0</FileVersion>
 		<AssemblyVersion>8.0.0.0</AssemblyVersion>
-		<AssemblyName>Sharlayan</AssemblyName>
 		<RootNamespace>Sharlayan</RootNamespace>
-		<PackageId>Sharlayan</PackageId>
+		<PackageId>Sharlayan.Lite</PackageId>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<RepositoryType></RepositoryType>
 		<PackageIcon>Logo.png</PackageIcon>
