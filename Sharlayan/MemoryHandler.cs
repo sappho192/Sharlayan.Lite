@@ -40,7 +40,7 @@ namespace Sharlayan {
         public MemoryHandler(SharlayanConfiguration configuration) {
             this.Configuration = configuration;
             try {
-                this.ProcessHandle = UnsafeNativeMethods.OpenProcess(UnsafeNativeMethods.ProcessAccessFlags.PROCESS_VM_ALL, false, (uint) this.Configuration.ProcessModel.ProcessID);
+                this.ProcessHandle = UnsafeNativeMethods.OpenProcess(UnsafeNativeMethods.ProcessAccessFlags.PROCESS_VM_ALL, false, (uint)this.Configuration.ProcessModel.ProcessID);
             }
             catch (Exception) {
                 this.ProcessHandle = this.Configuration.ProcessModel.Process.Handle;
@@ -56,19 +56,6 @@ namespace Sharlayan {
 
             this.Scanner = new Scanner(this);
             this.Reader = new Reader(this);
-
-            if (this._isNewInstance) {
-                this._isNewInstance = false;
-
-                Task.Run(
-                    async () => {
-                        await this.ResolveMemoryStructures();
-
-                        await ActionLookup.Resolve(this.Configuration);
-                        await StatusEffectLookup.Resolve(this.Configuration);
-                        await ZoneLookup.Resolve(this.Configuration);
-                    });
-            }
 
             Task.Run(
                 async () => {
@@ -211,7 +198,7 @@ namespace Sharlayan {
         public T GetStructure<T>(IntPtr address, int offset = 0) {
             IntPtr buffer = Marshal.AllocCoTaskMem(Marshal.SizeOf(typeof(T)));
             UnsafeNativeMethods.ReadProcessMemory(this.Configuration.ProcessModel.Process.Handle, address + offset, buffer, new IntPtr(Marshal.SizeOf(typeof(T))), out IntPtr bytesRead);
-            T retValue = (T) Marshal.PtrToStructure(buffer, typeof(T));
+            T retValue = (T)Marshal.PtrToStructure(buffer, typeof(T));
             Marshal.FreeCoTaskMem(buffer);
             return retValue;
         }
@@ -277,7 +264,7 @@ namespace Sharlayan {
             try {
                 foreach (ProcessModule module in this._systemModules) {
                     long baseAddress = module.BaseAddress.ToInt64();
-                    if (baseAddress <= (long) address && baseAddress + module.ModuleMemorySize >= (long) address) {
+                    if (baseAddress <= (long)address && baseAddress + module.ModuleMemorySize >= (long)address) {
                         return module;
                     }
                 }
@@ -302,10 +289,6 @@ namespace Sharlayan {
             }
 
             return false;
-        }
-
-        internal async Task ResolveMemoryStructures() {
-            this.Structures = await APIHelper.GetStructures(this.Configuration);
         }
 
         protected internal virtual void RaiseException(Logger logger, Exception ex) {

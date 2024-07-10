@@ -118,8 +118,6 @@ namespace Sharlayan.Core.Interfaces {
 
         byte StatusID { get; set; }
 
-        List<StatusItem> StatusItems { get; }
-
         byte TargetFlags { get; set; }
 
         int TargetID { get; set; }

@@ -12,7 +12,7 @@ namespace Sharlayan.Core {
     using Sharlayan.Core.Enums;
     using Sharlayan.Core.Interfaces;
 
-    public class ActorItem : ActorItemBase, IActorItem {
+    public class ActorItem : ActorItemBase {
         public double CastingPercentage =>
             this.IsCasting1 && this.CastingTime > 0
                 ? this.CastingProgress / this.CastingTime
@@ -133,33 +133,7 @@ namespace Sharlayan.Core {
         public bool WeaponUnsheathed => (this.CombatFlags & (1 << 0)) != 0;
 
         public ActorItem Clone() {
-            ActorItem cloned = (ActorItem) this.MemberwiseClone();
-
-            cloned.Coordinate = new Coordinate(this.Coordinate.X, this.Coordinate.Z, this.Coordinate.Y);
-            cloned.EnmityItems = new System.Collections.Generic.List<EnmityItem>();
-            cloned.StatusItems = new System.Collections.Generic.List<StatusItem>();
-
-            foreach (EnmityItem enmityItem in this.EnmityItems) {
-                cloned.EnmityItems.Add(
-                    new EnmityItem {
-                        Enmity = enmityItem.Enmity,
-                        ID = enmityItem.ID,
-                        Name = enmityItem.Name,
-                    });
-            }
-
-            foreach (StatusItem statusItem in this.StatusItems) {
-                cloned.StatusItems.Add(
-                    new StatusItem {
-                        CasterID = statusItem.CasterID,
-                        Duration = statusItem.Duration,
-                        IsCompanyAction = statusItem.IsCompanyAction,
-                        Stacks = statusItem.Stacks,
-                        StatusID = statusItem.StatusID,
-                        StatusName = statusItem.StatusName,
-                        TargetName = statusItem.TargetName,
-                    });
-            }
+            ActorItem cloned = (ActorItem)this.MemberwiseClone();
 
             return cloned;
         }

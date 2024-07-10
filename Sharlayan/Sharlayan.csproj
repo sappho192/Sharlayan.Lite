@@ -25,6 +25,7 @@
 		<RepositoryType></RepositoryType>
 		<PackageIcon>Logo.png</PackageIcon>
 		<LangVersion>latest</LangVersion>
+		<NoWarn>$(NoWarn);1591</NoWarn>
 	</PropertyGroup>
 
 	<ItemGroup>

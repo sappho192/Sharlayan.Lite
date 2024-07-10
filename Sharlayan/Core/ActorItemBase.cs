@@ -17,8 +17,6 @@ namespace Sharlayan.Core {
     public class ActorItemBase {
         private string _name;
 
-        public Coordinate Coordinate { get; set; }
-
         public short CPCurrent { get; set; }
 
         public short CPMax { get; set; }
@@ -26,8 +24,6 @@ namespace Sharlayan.Core {
         public double CPPercent => this.safeDivide(this.CPCurrent, this.CPMax);
 
         public string CPString => $"{this.CPCurrent}/{this.CPMax} [{this.CPPercent:P2}]";
-
-        public List<EnmityItem> EnmityItems { get; protected set; } = new List<EnmityItem>();
 
         public short GPCurrent { get; set; }
 
@@ -68,8 +64,6 @@ namespace Sharlayan.Core {
             set => this._name = value;
         }
 
-        public List<StatusItem> StatusItems { get; protected set; } = new List<StatusItem>();
-
         public string UUID { get; set; }
 
         public double X { get; set; }
@@ -86,16 +80,16 @@ namespace Sharlayan.Core {
         }
 
         public float GetDistanceTo(ActorItem compare) {
-            float distanceX = (float) Math.Abs(compare.X - this.X);
-            float distanceY = (float) Math.Abs(compare.Y - this.Y);
-            float distanceZ = (float) Math.Abs(compare.Z - this.Z);
-            return (float) Math.Sqrt(Math.Pow(distanceX, 2) + Math.Pow(distanceY, 2) + Math.Pow(distanceZ, 2));
+            float distanceX = (float)Math.Abs(compare.X - this.X);
+            float distanceY = (float)Math.Abs(compare.Y - this.Y);
+            float distanceZ = (float)Math.Abs(compare.Z - this.Z);
+            return (float)Math.Sqrt(Math.Pow(distanceX, 2) + Math.Pow(distanceY, 2) + Math.Pow(distanceZ, 2));
         }
 
         public float GetHorizontalDistanceTo(ActorItem compare) {
-            float distanceX = (float) Math.Abs(compare.X - this.X);
-            float distanceY = (float) Math.Abs(compare.Y - this.Y);
-            return (float) Math.Sqrt(Math.Pow(distanceX, 2) + Math.Pow(distanceY, 2));
+            float distanceX = (float)Math.Abs(compare.X - this.X);
+            float distanceY = (float)Math.Abs(compare.Y - this.Y);
+            return (float)Math.Sqrt(Math.Pow(distanceX, 2) + Math.Pow(distanceY, 2));
         }
 
         private double safeDivide(double a, double b) {

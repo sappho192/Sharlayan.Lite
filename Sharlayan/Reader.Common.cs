@@ -13,8 +13,6 @@ namespace Sharlayan {
 
     using NLog;
 
-    using Sharlayan.Core.Enums;
-
     public partial class Reader {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
@@ -34,15 +32,6 @@ namespace Sharlayan {
             }
 
             return canRead;
-        }
-
-        private (ushort EventObjectTypeID, Actor.EventObjectType EventObjectType) GetEventObjectType(IntPtr address) {
-            IntPtr eventObjectTypePointer = IntPtr.Add(address, this._memoryHandler.Structures.ActorItem.EventObjectType);
-            IntPtr eventObjectTypeAddress = this._memoryHandler.ReadPointer(eventObjectTypePointer, 4);
-
-            ushort eventObjectTypeID = this._memoryHandler.GetUInt16(eventObjectTypeAddress);
-
-            return (eventObjectTypeID, (Actor.EventObjectType) eventObjectTypeID);
         }
 
         private (uint mapID, uint mapIndex, uint mapTerritory) GetMapInfo() {
