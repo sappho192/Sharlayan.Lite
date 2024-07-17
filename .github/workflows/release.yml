@@ -1,0 +1,74 @@
+name: Release .NET Core / .NET Full Framework Library
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        configuration: [Release]
+
+    runs-on: windows-latest
+
+    env:
+      SOLUTION_NAME: Sharlayan
+      NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # Install the .NET Core workload
+      - name: Install .NET Core
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            7.0.x
+            6.0.x
+
+      # Add  MSBuild to the PATH: https://github.com/microsoft/setup-msbuild
+      - name: Setup MSBuild.exe
+        uses: microsoft/setup-msbuild@v2
+
+      # Get Library Version
+      - name: Get Library Version
+        id: get_version
+        run: |
+          $version = [System.Version]::Parse((Get-Content -Path .\${{ env.SOLUTION_NAME }}\${{ env.SOLUTION_NAME }}.csproj -Raw | Select-String -Pattern '<Version>(.*)</Version>').Matches.Groups[1].Value)
+          echo "Library Version: $version"
+          echo "::set-output name=version::$version"
+
+      # Restore the application to populate the obj folder with RuntimeIdentifiers
+      - name: Restore the application
+        run: msbuild ${{ env.SOLUTION_NAME }}.sln /t:Restore /p:Configuration=$env:Configuration
+        env:
+          Configuration: ${{ matrix.configuration }}
+
+      # Build the application
+      - name: Build the application
+        run: msbuild ${{ env.SOLUTION_NAME }}.sln /t:Build /p:Configuration=$env:Configuration /p:WarningLevel=0
+        env:
+          Configuration: ${{ matrix.configuration }}
+
+      # Upload the build artifacts
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: sharlayan-latest
+          path: |
+            published/
+          overwrite: true
+
+      # Publish each package to NuGet
+      - name: Publish each package to NuGet
+        run: |
+          $packages = Get-ChildItem -Path .\published\ -Filter *.nupkg
+          foreach ($package in $packages) {
+            dotnet nuget push $package.FullName --skip-duplicate --api-key ${{ env.NUGET_TOKEN }} --source https://api.nuget.org/v3/index.json
+          }

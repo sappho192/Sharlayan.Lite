@@ -11,7 +11,7 @@
 		<PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
 		<PackageTags>ffxiv memory tracking</PackageTags>
 		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
-		<Version>8.0.0</Version>
+		<Version>8.0.1</Version>
 		<Company>SyndicatedLife</Company>
 		<Product>Sharlayan.Lite</Product>
 		<Description>This fork is a lightweight version of the original library and only has ChatLog functionality.</Description>
