@@ -1,10 +1,18 @@
-# sharlayan
+# Sharlayan
 
 This fork is a lightweight version of the original library and only has ChatLog functionality.
 
+# Nuget Package list
+
+| Package       | repo                                                                                                                            | description  |
+| ------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| Sharlayan.Lite | [![Nuget Sharlayan.Lite](https://img.shields.io/nuget/v/Sharlayan.Lite.svg?style=flat)](https://www.nuget.org/packages/Sharlayan.Lite/) | Main library |
+
 # How do I use it and what comes back?
 
-- Add as a reference into your project.
+- .NET CLI: `dotnet add package Sharlayan.Lite --version 8.0.1`
+- Nuget Package Manager: `Install-Package Sharlayan.Lite -Version 8.0.1`
+- PackageReference: `<PackageReference Include="Sharlayan.Lite" Version="8.0.1" />`
 
 That's the basic of it. For actual instantiation it works as follows:
 
@@ -33,7 +41,7 @@ if (processes.length)
         GameLanguage = gameLanguage,
         GameRegion = gameRegion,
         PatchVersion = patchVersion,
-        UseLocalCache = Settings.Default.UseLocalMemoryJSONDataCache
+        UseLocalCache = useLocalCache
     };
     MemoryHandler memoryHandler = SharlayanMemoryManager.Instance.AddHandler(configuration);
 }
@@ -65,22 +73,22 @@ using Sharlayan;
 int _previousArrayIndex = 0;
 int _previousOffset = 0;
 
-ChatLogReadResult readResult = memoryHandler.Reader.GetChatLog(_previousArrayIndex, _previousOffset);
+var readResult = memoryHandler.Reader.GetChatLog(_previousArrayIndex, _previousOffset);
 
-List<ChatLogEntry> chatLogEntries = readResult.ChatLogEntries;
+var chatLogItems = readResult.ChatLogItems;
 
 _previousArrayIndex = readResult.PreviousArrayIndex;
 _previousOffset = readResult.PreviousOffset;
 
 // The result is the following class
-public class ChatLogReadResult
+public class ChatLogResult
 {
-    public ChatLogReadResult()
+    public ChatLogResult()
     {
-        ChatLogEntries = new List<ChatLogEntry>();
+        ChatLogItems = new ConcurrentQueue<ChatLogItem>();
     }
 
-    public List<ChatLogEntry> ChatLogEntries { get; set; }
+    public ConcurrentQueue<ChatLogItem> ChatLogItems { get; set; }
     public int PreviousArrayIndex { get; set; }
     public int PreviousOffset { get; set; }
 }
