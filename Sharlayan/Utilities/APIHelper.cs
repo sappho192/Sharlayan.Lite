@@ -21,6 +21,8 @@ namespace Sharlayan.Utilities {
     using Newtonsoft.Json;
 
     using Sharlayan.Models;
+    using Sharlayan.Models.Structures;
+
     public static class APIHelper {
         private static Encoding _webClientEncoding = Encoding.UTF8;
 
@@ -48,6 +50,25 @@ namespace Sharlayan.Utilities {
             return resolved;
         }
 
+        public static async Task<StructuresContainer> GetStructures(SharlayanConfiguration configuration) {
+            string region = configuration.GameRegion.ToString().ToLowerInvariant();
+            string patchVersion = configuration.PatchVersion;
+            string file = Path.Combine(configuration.JSONCacheDirectory, $"structures-{region}-latest.json");
+
+            if (File.Exists(file) && configuration.UseLocalCache) {
+                return EnsureClassValues<StructuresContainer>(file);
+            }
+
+            // StructuresContainer structuresContainer = await APIResponseTo<StructuresContainer>($"{configuration.APIBaseURL}/structures/{patchVersion}/x64.json");
+            StructuresContainer structuresContainer = await APIResponseTo<StructuresContainer>($"{configuration.APIBaseURL}/structures/latest/x64.json");
+
+            if (configuration.UseLocalCache) {
+                File.WriteAllText(file, JsonConvert.SerializeObject(structuresContainer, Formatting.Indented, Constants.SerializerSettings), Encoding.UTF8);
+            }
+
+            return structuresContainer;
+        }
+
         private static async Task<string> APIResponseToJSON(string uri) {
             using HttpRequestMessage request = new HttpRequestMessage {
                 Method = HttpMethod.Get,
@@ -64,6 +85,10 @@ namespace Sharlayan.Utilities {
             string json = await APIResponseToJSON(uri);
 
             return JsonConvert.DeserializeObject<T>(json, Constants.SerializerSettings);
+        }
+
+        private static T EnsureClassValues<T>(string file) {
+            return FileResponseToJSON<T>(file);
         }
 
         private static T FileResponseToJSON<T>(string file) {

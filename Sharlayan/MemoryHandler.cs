@@ -57,6 +57,15 @@ namespace Sharlayan {
             this.Scanner = new Scanner(this);
             this.Reader = new Reader(this);
 
+            if (this._isNewInstance) {
+                this._isNewInstance = false;
+
+                Task.Run(
+                    async () => {
+                        await this.ResolveMemoryStructures();
+                    });
+            }
+
             Task.Run(
                 async () => {
                     Signature[] signatures = await Signatures.Resolve(this.Configuration);
@@ -289,6 +298,10 @@ namespace Sharlayan {
             }
 
             return false;
+        }
+
+        internal async Task ResolveMemoryStructures() {
+            this.Structures = await APIHelper.GetStructures(this.Configuration);
         }
 
         protected internal virtual void RaiseException(Logger logger, Exception ex) {
