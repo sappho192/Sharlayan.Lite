@@ -1,6 +1,6 @@
-# Sharlayan
+# Sharlayan.Lite
 
-This fork is a lightweight version of the original library and only has ChatLog functionality.
+This fork is a lightweight version of the original library and only has memory search & ChatLog functionality.
 
 # Nuget Package list
 
