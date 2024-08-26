@@ -23,7 +23,7 @@ using Sharlayan.Models;
 
 // DX11
 Process[] processes = Process.GetProcessesByName("ffxiv_dx11");
-if (processes.length)
+if (processes.Length > 0)
 {
     // supported: Global, Chinese, Korean
     GameRegion gameRegion = GameRegion.Global;
@@ -35,7 +35,7 @@ if (processes.length)
     Process process = processes[0];
     ProcessModel processModel = new ProcessModel {
         Process = process
-    }
+    };
     SharlayanConfiguration configuration = new SharlayanConfiguration {
         ProcessModel = processModel,
         GameLanguage = gameLanguage,
