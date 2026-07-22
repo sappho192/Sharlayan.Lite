@@ -17,14 +17,23 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - name: Install .NET SDKs
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: |
+            10.0.x
             8.0.x
             7.0.x
             6.0.x
+
+      - name: Generate chat resources
+        run: dotnet run --project tools/Sharlayan.ChatResources.Generator/Sharlayan.ChatResources.Generator.csproj --configuration Release --no-launch-profile
+
+      - name: Verify generated resources
+        run: git diff --exit-code -- Sharlayan/Resources/GeneratedChatResources.g.cs
 
       - name: Restore
         run: dotnet restore Sharlayan.sln

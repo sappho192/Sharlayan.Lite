@@ -21,6 +21,7 @@ namespace Sharlayan {
 
     using Sharlayan.Models;
     using Sharlayan.Models.Structures;
+    using Sharlayan.Resources;
     using Sharlayan.Utilities;
 
     public class MemoryHandler : IDisposable {
@@ -31,8 +32,6 @@ namespace Sharlayan {
         public delegate void MemoryLocationsFoundEvent(object sender, ConcurrentDictionary<string, MemoryLocation> memoryLocations, long processingTime);
 
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
-
-        private bool _isNewInstance = true;
 
         private bool _ownsProcessHandle;
 
@@ -59,35 +58,11 @@ namespace Sharlayan {
 
             this.GetProcessModules();
 
+            this.Structures = GeneratedChatResources.CreateStructures();
             this.Scanner = new Scanner(this);
             this.Reader = new Reader(this);
 
-            if (this._isNewInstance) {
-                this._isNewInstance = false;
-
-                Task.Run(
-                    async () => {
-                        await this.ResolveMemoryStructures();
-                    })
-                    .ContinueWith(
-                        task => {
-                            Logger.Error(task.Exception, "Background structure resolution faulted.");
-                            this.RaiseException(Logger, task.Exception);
-                        },
-                        TaskContinuationOptions.OnlyOnFaulted);
-            }
-
-            Task.Run(
-                async () => {
-                    Signature[] signatures = await Signatures.Resolve(this.Configuration);
-                    this.Scanner.LoadOffsets(signatures, this.Configuration.ScanAllRegions);
-                })
-                .ContinueWith(
-                    task => {
-                        Logger.Error(task.Exception, "Background signature resolution faulted.");
-                        this.RaiseException(Logger, task.Exception);
-                    },
-                    TaskContinuationOptions.OnlyOnFaulted);
+            this.Scanner.LoadOffsets(GeneratedChatResources.CreateSignatures(), this.Configuration.ScanAllRegions);
         }
 
         public SharlayanConfiguration Configuration { get; set; }
@@ -376,8 +351,9 @@ namespace Sharlayan {
             return false;
         }
 
-        internal async Task ResolveMemoryStructures() {
-            this.Structures = await APIHelper.GetStructures(this.Configuration);
+        internal Task ResolveMemoryStructures() {
+            this.Structures = GeneratedChatResources.CreateStructures();
+            return Task.CompletedTask;
         }
 
         protected internal virtual void RaiseException(Logger logger, Exception ex) {

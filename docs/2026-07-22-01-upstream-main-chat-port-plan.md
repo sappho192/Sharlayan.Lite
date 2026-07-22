@@ -417,11 +417,11 @@ upstream의 `net10.0` 전환은 전체 FCS/Lumina 재구축에 따른 선택이�
 - [x] PR #116 chat 변경 수동 이식
 - [x] PR #116 memory/scanner/native 변경 수동 이식
 - [x] 초기화 task 오류 관찰 적용
-- [ ] FCS submodule pin 추가
-- [ ] chat resource generator 구현
-- [ ] generated resource freshness CI 추가
-- [ ] JSON runtime dependency 제거
-- [ ] obsolete compatibility shim 적용
+- [x] FCS submodule pin 추가
+- [x] chat resource generator 구현
+- [x] generated resource freshness CI 추가
+- [x] JSON runtime dependency 제거
+- [x] obsolete compatibility shim 적용
 - [ ] dynamic ring capacity 및 pointer invariant 적용
 - [ ] `CharacterName` fallback 적용
 - [ ] `min-chat` CI와 release trigger 수정

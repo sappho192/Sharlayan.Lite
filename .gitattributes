@@ -3,6 +3,7 @@
 
 # Custom for Visual Studio
 *.cs     diff=csharp
+Sharlayan/Resources/GeneratedChatResources.g.cs text eol=lf
 *.sln    merge=union
 *.csproj merge=union
 *.vbproj merge=union
