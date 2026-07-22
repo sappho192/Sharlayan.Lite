@@ -425,7 +425,7 @@ upstream의 `net10.0` 전환은 전체 FCS/Lumina 재구축에 따른 선택이�
 - [x] dynamic ring capacity 및 pointer invariant 적용
 - [x] 명시적 초기화 완료 task와 상태 추가
 - [x] `CharacterName` fallback 적용
-- [ ] `min-chat` CI와 release trigger 수정
+- [x] `min-chat` CI와 수동 release workflow 정비
 - [ ] 현재 게임 live smoke 수행
 - [ ] prerelease consumer 검증
 - [ ] stable release와 FCS/game patch 매핑 기록

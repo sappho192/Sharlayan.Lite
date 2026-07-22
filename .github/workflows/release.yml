@@ -1,74 +1,105 @@
-name: Release .NET Core / .NET Full Framework Library
+name: Release Sharlayan.Lite
 
 on:
   workflow_dispatch:
-  push:
-    branches: ["main"]
+    inputs:
+      package_version:
+        description: NuGet package version, for example 8.1.0-beta.1
+        required: true
+        type: string
+      publish:
+        description: Publish the verified package to NuGet
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        configuration: [Release]
-
+  release:
+    if: github.ref == 'refs/heads/min-chat'
     runs-on: windows-latest
-
-    env:
-      SOLUTION_NAME: Sharlayan
-      NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           fetch-depth: 0
+          submodules: recursive
 
-      # Install the .NET Core workload
-      - name: Install .NET Core
-        uses: actions/setup-dotnet@v4
+      - name: Install .NET SDKs
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
         with:
           dotnet-version: |
+            10.0.x
             8.0.x
             7.0.x
             6.0.x
 
-      # Add  MSBuild to the PATH: https://github.com/microsoft/setup-msbuild
-      - name: Setup MSBuild.exe
-        uses: microsoft/setup-msbuild@v2
-
-      # Get Library Version
-      - name: Get Library Version
-        id: get_version
+      - name: Validate package version
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ inputs.package_version }}
         run: |
-          $version = [System.Version]::Parse((Get-Content -Path .\${{ env.SOLUTION_NAME }}\${{ env.SOLUTION_NAME }}.csproj -Raw | Select-String -Pattern '<Version>(.*)</Version>').Matches.Groups[1].Value)
-          echo "Library Version: $version"
-          echo "::set-output name=version::$version"
+          $identifier = '(?:0|[1-9]\d*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)'
+          if ($env:PACKAGE_VERSION -notmatch "^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-$identifier(?:\.$identifier)*)?$") {
+            throw "Invalid package version '$env:PACKAGE_VERSION'."
+          }
 
-      # Restore the application to populate the obj folder with RuntimeIdentifiers
-      - name: Restore the application
-        run: msbuild ${{ env.SOLUTION_NAME }}.sln /t:Restore /p:Configuration=$env:Configuration
+      - name: Generate chat resources
+        run: dotnet run --project tools/Sharlayan.ChatResources.Generator/Sharlayan.ChatResources.Generator.csproj --configuration Release --no-launch-profile
+
+      - name: Verify generated resources
+        run: git diff --exit-code -- Sharlayan/Resources/GeneratedChatResources.g.cs
+
+      - name: Restore
+        run: dotnet restore Sharlayan.sln
+
+      - name: Build all target frameworks
+        shell: pwsh
         env:
-          Configuration: ${{ matrix.configuration }}
+          PACKAGE_VERSION: ${{ inputs.package_version }}
+        run: dotnet build Sharlayan.sln --configuration Release --no-restore --nologo -p:Version=$env:PACKAGE_VERSION
 
-      # Build the application
-      - name: Build the application
-        run: msbuild ${{ env.SOLUTION_NAME }}.sln /t:Build /p:Configuration=$env:Configuration /p:WarningLevel=0
+      - name: Test
+        run: dotnet test Sharlayan.Tests/Sharlayan.Tests.csproj --configuration Release --no-build --no-restore --nologo
+
+      - name: Pack
+        shell: pwsh
         env:
-          Configuration: ${{ matrix.configuration }}
+          PACKAGE_VERSION: ${{ inputs.package_version }}
+        run: dotnet pack Sharlayan/Sharlayan.csproj --configuration Release --no-build --no-restore --nologo --output artifacts/packages -p:PackageVersion=$env:PACKAGE_VERSION
 
-      # Upload the build artifacts
-      - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+      - name: Verify package
+        shell: pwsh
+        env:
+          PACKAGE_VERSION: ${{ inputs.package_version }}
+        run: ./tools/Verify-Package.ps1 -PackageDirectory artifacts/packages -ExpectedPackageVersion $env:PACKAGE_VERSION
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: sharlayan-latest
-          path: |
-            published/
-          overwrite: true
+          name: sharlayan-lite-${{ inputs.package_version }}
+          path: artifacts/packages/*
+          if-no-files-found: error
 
-      # Publish each package to NuGet
-      - name: Publish each package to NuGet
+      - name: Publish package to NuGet
+        if: ${{ inputs.publish }}
+        shell: pwsh
+        env:
+          NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
         run: |
-          $packages = Get-ChildItem -Path .\published\ -Filter *.nupkg
-          foreach ($package in $packages) {
-            dotnet nuget push $package.FullName --skip-duplicate --api-key ${{ env.NUGET_TOKEN }} --source https://api.nuget.org/v3/index.json
+          $packages = @(Get-ChildItem -LiteralPath artifacts/packages -File -Filter '*.nupkg')
+          if ($packages.Count -ne 1) {
+            throw "Expected exactly one package to publish, found $($packages.Count)."
+          }
+
+          dotnet nuget push $packages[0].FullName --api-key $env:NUGET_TOKEN --source https://api.nuget.org/v3/index.json
+          if ($LASTEXITCODE -ne 0) {
+            throw "NuGet push failed with exit code $LASTEXITCODE."
           }

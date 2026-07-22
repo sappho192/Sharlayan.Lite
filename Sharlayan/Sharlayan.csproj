@@ -3,6 +3,7 @@
 		<TargetFrameworks>net462;net48;net6.0;net7.0;net8.0</TargetFrameworks>
 		<IncludeSymbols>true</IncludeSymbols>
 		<IncludeSource>true</IncludeSource>
+		<SymbolPackageFormat>snupkg</SymbolPackageFormat>
 		<Authors>Ryan Wilson, Taein Kim</Authors>
 		<PackageLicenseUrl></PackageLicenseUrl>
 		<PackageProjectUrl>https://github.com/sappho192/Sharlayan.Lite</PackageProjectUrl>
@@ -10,7 +11,9 @@
 		<RepositoryUrl></RepositoryUrl>
 		<PackageRequireLicenseAcceptance>true</PackageRequireLicenseAcceptance>
 		<PackageTags>ffxiv memory tracking</PackageTags>
-		<GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+		<EnablePackageValidation>true</EnablePackageValidation>
+		<PackageValidationBaselineVersion>8.0.1</PackageValidationBaselineVersion>
 		<Version>8.0.1</Version>
 		<Company>SyndicatedLife</Company>
 		<Product>Sharlayan.Lite</Product>
@@ -105,15 +108,4 @@
 			<PackagePath></PackagePath>
 		</None>
 	</ItemGroup>
-
-	<Target Name="CopyPackages" AfterTargets="Pack">
-		<ItemGroup>
-			<PACKAGES Include="$(OutputPath)*.nupkg" />
-		</ItemGroup>
-		<Copy SourceFiles="@(PACKAGES)" DestinationFolder="$(SolutionDir)published\" />
-	</Target>
-
-	<Target Name="PostBuild" AfterTargets="CopyPackages">
-		<Exec Command="%25SYSTEMROOT%25\System32\WindowsPowerShell\v1.0\powershell.exe –NonInteractive –ExecutionPolicy Unrestricted –command &quot;&amp; { &amp;'$(SolutionDir)RenameSymbolsToPackage.ps1' '$(TargetName)' }&quot;" />
-	</Target>
 </Project>

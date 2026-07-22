@@ -5,7 +5,14 @@
 
 version: 2
 updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "min-chat"
+
   - package-ecosystem: "nuget" # See documentation for possible values
     directory: "/dep_chk" # Location of package manifests
     schedule:
       interval: "weekly"
+    target-branch: "min-chat"
