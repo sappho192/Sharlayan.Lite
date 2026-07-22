@@ -11,18 +11,29 @@
 namespace Sharlayan.Utilities {
     using System;
     using System.Collections.Generic;
-    using System.Linq;
 
     using NLog;
 
     using Sharlayan.Models;
 
     internal class ChatLogReader {
-        private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
+        private const int BufferSize = 4000;
 
-        public readonly List<int> Indexes = new List<int>();
+        private readonly Func<bool> _canRead;
 
-        private int BUFFER_SIZE = 4000;
+        private readonly Func<IntPtr> _getChatLogAddress;
+
+        private readonly byte[] _indexBuffer = new byte[BufferSize];
+
+        private readonly Func<bool> _isAttached;
+
+        private readonly Action<Logger, Exception> _raiseException;
+
+        private readonly Action<IntPtr, byte[]> _readBytes;
+
+        private readonly Func<IntPtr, ChatLogPointers> _readPointers;
+
+        public readonly List<int> Indexes = new List<int>(BufferSize / sizeof(int));
 
         public bool ChatLogFirstRun = true;
 
@@ -32,41 +43,73 @@ namespace Sharlayan.Utilities {
 
         public int PreviousOffset;
 
-        public ChatLogReader(MemoryHandler memoryHandler) {
-            this._memoryHandler = memoryHandler;
+        public ChatLogReader(MemoryHandler memoryHandler)
+            : this(
+                () => memoryHandler.Scanner.Locations.ContainsKey(Signatures.CHATLOG_KEY),
+                () => memoryHandler.IsAttached,
+                () => memoryHandler.Scanner.Locations[Signatures.CHATLOG_KEY],
+                address => new ChatLogPointers {
+                    LineCount = memoryHandler.GetUInt32(address),
+                    OffsetArrayStart = memoryHandler.GetInt64(address, memoryHandler.Structures.ChatLogPointers.OffsetArrayStart),
+                    OffsetArrayPos = memoryHandler.GetInt64(address, memoryHandler.Structures.ChatLogPointers.OffsetArrayPos),
+                    OffsetArrayEnd = memoryHandler.GetInt64(address, memoryHandler.Structures.ChatLogPointers.OffsetArrayEnd),
+                    LogStart = memoryHandler.GetInt64(address, memoryHandler.Structures.ChatLogPointers.LogStart),
+                    LogNext = memoryHandler.GetInt64(address, memoryHandler.Structures.ChatLogPointers.LogNext),
+                    LogEnd = memoryHandler.GetInt64(address, memoryHandler.Structures.ChatLogPointers.LogEnd),
+                },
+                memoryHandler.GetByteArray,
+                memoryHandler.RaiseException) {
         }
 
-        private MemoryHandler _memoryHandler { get; }
+        internal ChatLogReader(
+            Func<bool> canRead,
+            Func<bool> isAttached,
+            Func<IntPtr> getChatLogAddress,
+            Func<IntPtr, ChatLogPointers> readPointers,
+            Action<IntPtr, byte[]> readBytes,
+            Action<Logger, Exception> raiseException) {
+            this._canRead = canRead;
+            this._isAttached = isAttached;
+            this._getChatLogAddress = getChatLogAddress;
+            this._readPointers = readPointers;
+            this._readBytes = readBytes;
+            this._raiseException = raiseException;
+        }
+
+        internal bool CanRead => this._canRead();
+
+        internal bool IsAttached => this._isAttached();
+
+        internal IntPtr GetChatLogAddress() {
+            return this._getChatLogAddress();
+        }
+
+        internal ChatLogPointers ReadPointers(IntPtr address) {
+            return this._readPointers(address);
+        }
+
+        internal void RaiseException(Logger logger, Exception exception) {
+            this._raiseException(logger, exception);
+        }
 
         public void EnsureArrayIndexes() {
             this.Indexes.Clear();
 
-            byte[] buffer = this._memoryHandler.BufferPool.Rent(this.BUFFER_SIZE);
-
-            try {
-                this._memoryHandler.GetByteArray(new IntPtr(this.ChatLogPointers.OffsetArrayStart), buffer);
-                for (int i = 0; i < this.BUFFER_SIZE; i += 4) {
-                    this.Indexes.Add(BitConverter.ToInt32(buffer, i));
-                }
-            }
-            catch (Exception ex) {
-                this._memoryHandler.RaiseException(Logger, ex);
-            }
-            finally {
-                this._memoryHandler.BufferPool.Return(buffer);
+            Array.Clear(this._indexBuffer, 0, this._indexBuffer.Length);
+            this._readBytes(new IntPtr(this.ChatLogPointers.OffsetArrayStart), this._indexBuffer);
+            for (int i = 0; i < BufferSize; i += sizeof(int)) {
+                this.Indexes.Add(BitConverter.ToInt32(this._indexBuffer, i));
             }
         }
 
         public IEnumerable<byte[]> ResolveEntries(int offset, int length) {
             List<byte[]> entries = new List<byte[]>();
 
-            this.EnsureArrayIndexes();
-
             for (int i = offset; i < length; i++) {
                 int currentOffset = this.Indexes[i];
 
                 byte[] entry = this.ResolveEntry(this.PreviousOffset, currentOffset);
-                if (entry.Any()) {
+                if (entry.Length > 0) {
                     entries.Add(entry);
                 }
 
@@ -85,18 +128,7 @@ namespace Sharlayan.Utilities {
                 return result;
             }
 
-            byte[] buffer = this._memoryHandler.BufferPool.Rent(size);
-
-            try {
-                this._memoryHandler.GetByteArray(new IntPtr(this.ChatLogPointers.LogStart + offset), buffer);
-                Buffer.BlockCopy(buffer, 0, result, 0, size);
-            }
-            catch (Exception ex) {
-                this._memoryHandler.RaiseException(Logger, ex);
-            }
-            finally {
-                this._memoryHandler.BufferPool.Return(buffer);
-            }
+            this._readBytes(new IntPtr(this.ChatLogPointers.LogStart + offset), result);
 
             return result;
         }

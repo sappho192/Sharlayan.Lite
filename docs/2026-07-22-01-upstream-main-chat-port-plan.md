@@ -411,9 +411,10 @@ upstream의 `net10.0` 전환은 전체 FCS/Lumina 재구축에 따른 선택이�
 ## 11. 추적 체크리스트
 
 - [x] 로컬 `min-chat`을 `origin/min-chat`에 fast-forward (`9a03add7...`)
-- [ ] baseline package/API/target framework 기록
+- [x] baseline package/API/target framework 기록
 - [x] chat parser와 cleaner 테스트 추가
-- [ ] PR #116 chat 변경 수동 이식
+- [x] chat reader ring buffer와 동시성 테스트 추가
+- [x] PR #116 chat 변경 수동 이식
 - [ ] PR #116 memory/scanner/native 변경 수동 이식
 - [ ] 초기화 task 오류 관찰 적용
 - [ ] FCS submodule pin 추가

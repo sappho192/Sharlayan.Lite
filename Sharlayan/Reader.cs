@@ -13,7 +13,7 @@ namespace Sharlayan {
     using Sharlayan.Utilities;
 
     public partial class Reader {
-        private ChatLogReader _chatLogReader;
+        private readonly ChatLogReader _chatLogReader;
 
         private ChatLogWorkerDelegate _chatLogWorkerDelegate = new ChatLogWorkerDelegate();
 
@@ -23,6 +23,13 @@ namespace Sharlayan {
             this._memoryHandler = memoryHandler;
 
             this._chatLogReader = new ChatLogReader(this._memoryHandler);
+
+            this._chatLogWorkerDelegate = new ChatLogWorkerDelegate();
+            this._pcWorkerDelegate = new PCWorkerDelegate();
+        }
+
+        internal Reader(ChatLogReader chatLogReader) {
+            this._chatLogReader = chatLogReader;
 
             this._chatLogWorkerDelegate = new ChatLogWorkerDelegate();
             this._pcWorkerDelegate = new PCWorkerDelegate();
