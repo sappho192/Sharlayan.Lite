@@ -32,7 +32,10 @@ namespace Sharlayan {
         }
 
         public ChatLogResult GetChatLog(int previousArrayIndex = 0, int previousOffset = 0) {
-            ChatLogResult result = new ChatLogResult();
+            ChatLogResult result = new ChatLogResult {
+                PreviousArrayIndex = previousArrayIndex,
+                PreviousOffset = previousOffset,
+            };
 
             if (!this.CanGetChatLog() || !this._chatLogReader.IsAttached) {
                 return result;
@@ -42,49 +45,70 @@ namespace Sharlayan {
             Exception readException = null;
 
             lock (this._chatLogLock) {
-                this._chatLogReader.PreviousArrayIndex = previousArrayIndex;
-                this._chatLogReader.PreviousOffset = previousOffset;
+                int resolvedArrayIndex = previousArrayIndex;
+                int resolvedOffset = previousOffset;
+                bool firstRun = this._chatLogReader.ChatLogFirstRun;
 
                 IntPtr chatPointerAddress = this._chatLogReader.GetChatLogAddress();
                 if (chatPointerAddress.ToInt64() <= 20) {
-                    return result;
+                    readException = new InvalidOperationException($"Invalid chat pointer address: 0x{chatPointerAddress.ToInt64():X}.");
                 }
 
                 try {
+                    if (readException != null) {
+                        throw readException;
+                    }
+
                     this._chatLogReader.ChatLogPointers = this._chatLogReader.ReadPointers(chatPointerAddress);
 
-                    long currentArrayIndex = (this._chatLogReader.ChatLogPointers.OffsetArrayPos - this._chatLogReader.ChatLogPointers.OffsetArrayStart) / 4;
-                    if (currentArrayIndex > 0) {
-                        if (this._chatLogReader.ChatLogFirstRun) {
-                            this._chatLogReader.EnsureArrayIndexes();
-                            this._chatLogReader.ChatLogFirstRun = false;
-                            this._chatLogReader.PreviousOffset = this._chatLogReader.Indexes[(int) currentArrayIndex - 1];
-                            this._chatLogReader.PreviousArrayIndex = (int) currentArrayIndex - 1;
-                        }
-                        else {
-                            this._chatLogReader.EnsureArrayIndexes();
-                            if (currentArrayIndex < this._chatLogReader.PreviousArrayIndex) {
-                                IEnumerable<byte[]> bufferEntries = this._chatLogReader.ResolveEntries(this._chatLogReader.PreviousArrayIndex, 1000);
-                                bufferList.AddRange(bufferEntries);
-                                this._chatLogReader.PreviousOffset = 0;
-                                this._chatLogReader.PreviousArrayIndex = 0;
-                            }
+                    int arrayCapacity = this._chatLogReader.GetArrayCapacity(out int currentArrayIndex);
+                    int logCapacity = this._chatLogReader.GetLogCapacity();
+                    this._chatLogReader.EnsureArrayIndexes(arrayCapacity);
+                    bool cursorInRange = resolvedArrayIndex >= 0 && resolvedArrayIndex <= arrayCapacity && resolvedOffset >= 0 && resolvedOffset <= logCapacity;
+                    bool cursorMatches = cursorInRange && this._chatLogReader.IsCursorBoundary(resolvedArrayIndex, resolvedOffset);
+                    if (!firstRun && this._chatLogReader.HasPointerVectorChanged(arrayCapacity) && !cursorMatches) {
+                        firstRun = true;
+                    }
+                    else if (!firstRun && !cursorMatches) {
+                        throw new InvalidOperationException($"Invalid previous chat cursor: index={resolvedArrayIndex}, offset={resolvedOffset}.");
+                    }
 
-                            if (this._chatLogReader.PreviousArrayIndex < currentArrayIndex) {
-                                IEnumerable<byte[]> bufferEntries = this._chatLogReader.ResolveEntries(this._chatLogReader.PreviousArrayIndex, (int) currentArrayIndex);
-                                bufferList.AddRange(bufferEntries);
-                            }
-
-                            this._chatLogReader.PreviousArrayIndex = (int) currentArrayIndex;
+                    if (firstRun) {
+                        firstRun = false;
+                        resolvedOffset = currentArrayIndex > 0 ? this._chatLogReader.Indexes[currentArrayIndex - 1] : 0;
+                        resolvedArrayIndex = currentArrayIndex;
+                        if (resolvedOffset < 0 || resolvedOffset > this._chatLogReader.GetLogPosition()) {
+                            throw new InvalidOperationException($"Invalid initial chat cursor offset: {resolvedOffset}.");
                         }
                     }
+                    else {
+                        if (currentArrayIndex < resolvedArrayIndex) {
+                            bufferList.AddRange(this._chatLogReader.ResolveEntries(resolvedArrayIndex, arrayCapacity, resolvedOffset, logCapacity, out resolvedOffset));
+                            resolvedOffset = 0;
+                            resolvedArrayIndex = 0;
+                        }
+
+                        if (resolvedArrayIndex < currentArrayIndex) {
+                            bufferList.AddRange(this._chatLogReader.ResolveEntries(resolvedArrayIndex, currentArrayIndex, resolvedOffset, this._chatLogReader.GetLogPosition(), out resolvedOffset));
+                        }
+
+                        resolvedArrayIndex = currentArrayIndex;
+                    }
+
+                    this._chatLogReader.ChatLogFirstRun = firstRun;
+                    this._chatLogReader.PreviousArrayIndex = resolvedArrayIndex;
+                    this._chatLogReader.PreviousOffset = resolvedOffset;
+                    this._chatLogReader.RememberPointerVector(arrayCapacity);
                 }
                 catch (Exception ex) {
                     readException = ex;
+                    bufferList.Clear();
                 }
 
-                result.PreviousArrayIndex = this._chatLogReader.PreviousArrayIndex;
-                result.PreviousOffset = this._chatLogReader.PreviousOffset;
+                if (readException == null) {
+                    result.PreviousArrayIndex = this._chatLogReader.PreviousArrayIndex;
+                    result.PreviousOffset = this._chatLogReader.PreviousOffset;
+                }
             }
 
             if (readException != null) {
@@ -99,8 +123,8 @@ namespace Sharlayan {
                 try {
                     ChatLogItem chatLogEntry = ChatEntry.Process(bytes);
 
-                    // assign logged user for this instance to chatLogEntry
-                    chatLogEntry.PlayerCharacterName = this._pcWorkerDelegate.CurrentUser?.Name ?? UNRESOLVED;
+                    string characterName = this._characterName();
+                    chatLogEntry.PlayerCharacterName = string.IsNullOrWhiteSpace(characterName) ? UNRESOLVED : characterName;
 
                     if (Regex.IsMatch(chatLogEntry.Combined, @"[\w\d]{4}::?.+")) {
                         result.ChatLogItems.Enqueue(chatLogEntry);

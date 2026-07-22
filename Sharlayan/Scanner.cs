@@ -59,13 +59,17 @@ namespace Sharlayan {
         private MemoryHandler _memoryHandler { get; }
 
         public void LoadOffsets(Signature[] signatures, bool scanAllRegions = false) {
+            _ = this.LoadOffsetsAsync(signatures, scanAllRegions);
+        }
+
+        internal Task LoadOffsetsAsync(Signature[] signatures, bool scanAllRegions = false) {
             if (this._memoryHandler.Configuration.ProcessModel.Process == null) {
-                return;
+                return Task.CompletedTask;
             }
 
             this.IsScanning = true;
 
-            Task.Run(
+            Task scanTask = Task.Run(
                 () => {
                     Stopwatch sw = new Stopwatch();
                     sw.Start();
@@ -99,13 +103,15 @@ namespace Sharlayan {
                     finally {
                         this.IsScanning = false;
                     }
-                })
-                .ContinueWith(
+                });
+            Task reportingTask = scanTask.ContinueWith(
                     task => {
                         Logger.Error(task.Exception, "Signature scan faulted.");
                         this._memoryHandler.RaiseException(Logger, task.Exception);
                     },
                     TaskContinuationOptions.OnlyOnFaulted);
+            _ = reportingTask.ContinueWith(task => { _ = task.Exception; }, TaskContinuationOptions.OnlyOnFaulted);
+            return scanTask;
         }
 
         private static int[] BuildBadShiftTable(byte[] pattern) {

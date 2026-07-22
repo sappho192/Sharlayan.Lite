@@ -62,7 +62,7 @@ namespace Sharlayan {
             this.Scanner = new Scanner(this);
             this.Reader = new Reader(this);
 
-            this.Scanner.LoadOffsets(GeneratedChatResources.CreateSignatures(), this.Configuration.ScanAllRegions);
+            this.InitializationTask = this.Scanner.LoadOffsetsAsync(GeneratedChatResources.CreateSignatures(), this.Configuration.ScanAllRegions);
         }
 
         public SharlayanConfiguration Configuration { get; set; }
@@ -75,6 +75,10 @@ namespace Sharlayan {
         }
 
         public Reader Reader { get; set; }
+
+        public Task InitializationTask { get; }
+
+        public bool IsInitialized => this.InitializationTask.Status == TaskStatus.RanToCompletion;
 
         public long ScanCount { get; set; }
 

@@ -17,13 +17,15 @@ namespace Sharlayan.Utilities {
     using Sharlayan.Models;
 
     internal class ChatLogReader {
-        private const int BufferSize = 4000;
+        private const int MaxArrayCapacity = 65536;
+
+        private const int MaxEntrySize = 1024 * 1024;
 
         private readonly Func<bool> _canRead;
 
         private readonly Func<IntPtr> _getChatLogAddress;
 
-        private readonly byte[] _indexBuffer = new byte[BufferSize];
+        private byte[] _indexBuffer = Array.Empty<byte>();
 
         private readonly Func<bool> _isAttached;
 
@@ -33,7 +35,15 @@ namespace Sharlayan.Utilities {
 
         private readonly Func<IntPtr, ChatLogPointers> _readPointers;
 
-        public readonly List<int> Indexes = new List<int>(BufferSize / sizeof(int));
+        private int _previousArrayCapacity;
+
+        private long _previousLogStart;
+
+        private long _previousOffsetArrayStart;
+
+        private bool _hasPointerSnapshot;
+
+        public readonly List<int> Indexes = new List<int>();
 
         public bool ChatLogFirstRun = true;
 
@@ -57,7 +67,11 @@ namespace Sharlayan.Utilities {
                     LogNext = memoryHandler.GetInt64(address, memoryHandler.Structures.ChatLogPointers.LogNext),
                     LogEnd = memoryHandler.GetInt64(address, memoryHandler.Structures.ChatLogPointers.LogEnd),
                 },
-                memoryHandler.GetByteArray,
+                (address, destination) => {
+                    if (!memoryHandler.Peek(address, destination)) {
+                        throw new InvalidOperationException($"Unable to read chat memory at 0x{address.ToInt64():X}.");
+                    }
+                },
                 memoryHandler.RaiseException) {
         }
 
@@ -92,45 +106,138 @@ namespace Sharlayan.Utilities {
             this._raiseException(logger, exception);
         }
 
-        public void EnsureArrayIndexes() {
+        public int GetArrayCapacity(out int currentArrayIndex) {
+            long start = this.ChatLogPointers.OffsetArrayStart;
+            long position = this.ChatLogPointers.OffsetArrayPos;
+            long end = this.ChatLogPointers.OffsetArrayEnd;
+
+            if (start <= 0 || start > position || position > end || start % sizeof(int) != 0 || position % sizeof(int) != 0 || end % sizeof(int) != 0) {
+                throw new InvalidOperationException($"Invalid chat index vector: start=0x{start:X}, position=0x{position:X}, end=0x{end:X}.");
+            }
+
+            long byteLength = end - start;
+            long positionOffset = position - start;
+            long capacity = byteLength / sizeof(int);
+            if (byteLength == 0 || byteLength % sizeof(int) != 0 || capacity > MaxArrayCapacity) {
+                throw new InvalidOperationException($"Invalid chat index capacity: {capacity}.");
+            }
+
+            currentArrayIndex = (int) (positionOffset / sizeof(int));
+            this.ValidateLogPointers();
+            return (int) capacity;
+        }
+
+        public void EnsureArrayIndexes(int capacity) {
+            if (capacity <= 0 || capacity > MaxArrayCapacity) {
+                throw new ArgumentOutOfRangeException(nameof(capacity));
+            }
+
+            int byteLength = checked(capacity * sizeof(int));
+            if (this._indexBuffer.Length != byteLength) {
+                this._indexBuffer = new byte[byteLength];
+            }
+
             this.Indexes.Clear();
 
             Array.Clear(this._indexBuffer, 0, this._indexBuffer.Length);
             this._readBytes(new IntPtr(this.ChatLogPointers.OffsetArrayStart), this._indexBuffer);
-            for (int i = 0; i < BufferSize; i += sizeof(int)) {
+            for (int i = 0; i < byteLength; i += sizeof(int)) {
                 this.Indexes.Add(BitConverter.ToInt32(this._indexBuffer, i));
             }
         }
 
         public IEnumerable<byte[]> ResolveEntries(int offset, int length) {
+            List<byte[]> entries = this.ResolveEntries(offset, length, this.PreviousOffset, this.GetLogPosition(), out int resolvedOffset);
+            this.PreviousOffset = resolvedOffset;
+            return entries;
+        }
+
+        internal List<byte[]> ResolveEntries(int offset, int length, int previousOffset, int maximumOffset, out int resolvedOffset) {
+            if (offset < 0 || length < offset || length > this.Indexes.Count) {
+                throw new InvalidOperationException($"Invalid chat index range: offset={offset}, length={length}, capacity={this.Indexes.Count}.");
+            }
+
             List<byte[]> entries = new List<byte[]>();
+            resolvedOffset = previousOffset;
 
             for (int i = offset; i < length; i++) {
                 int currentOffset = this.Indexes[i];
 
-                byte[] entry = this.ResolveEntry(this.PreviousOffset, currentOffset);
+                byte[] entry = this.ResolveEntry(resolvedOffset, currentOffset, maximumOffset);
                 if (entry.Length > 0) {
                     entries.Add(entry);
                 }
 
-                this.PreviousOffset = currentOffset;
+                resolvedOffset = currentOffset;
             }
 
             return entries;
         }
 
-        private byte[] ResolveEntry(int offset, int length) {
-            int size = length - offset;
+        internal int GetLogCapacity() {
+            return checked((int) this.ValidateLogPointers());
+        }
 
-            byte[] result = new byte[size];
+        internal int GetLogPosition() {
+            this.ValidateLogPointers();
+            return checked((int) (this.ChatLogPointers.LogNext - this.ChatLogPointers.LogStart));
+        }
+
+        internal bool HasPointerVectorChanged(int arrayCapacity) {
+            return this._hasPointerSnapshot && (this._previousArrayCapacity != arrayCapacity || this._previousOffsetArrayStart != this.ChatLogPointers.OffsetArrayStart || this._previousLogStart != this.ChatLogPointers.LogStart);
+        }
+
+        internal bool IsCursorBoundary(int arrayIndex, int offset) {
+            return arrayIndex == 0 ? offset == 0 : arrayIndex <= this.Indexes.Count && this.Indexes[arrayIndex - 1] == offset;
+        }
+
+        internal void RememberPointerVector(int arrayCapacity) {
+            this._previousArrayCapacity = arrayCapacity;
+            this._previousOffsetArrayStart = this.ChatLogPointers.OffsetArrayStart;
+            this._previousLogStart = this.ChatLogPointers.LogStart;
+            this._hasPointerSnapshot = true;
+        }
+
+        private byte[] ResolveEntry(int offset, int length, int maximumOffset) {
+            int logCapacity = this.GetLogCapacity();
+            if (maximumOffset < 0 || maximumOffset > logCapacity) {
+                throw new InvalidOperationException($"Invalid chat log read boundary: {maximumOffset}.");
+            }
+
+            if (offset < 0 || length < 0 || offset > maximumOffset || length > maximumOffset) {
+                throw new InvalidOperationException($"Invalid chat log offsets: previous={offset}, current={length}, maximum={maximumOffset}.");
+            }
+
+            int size = length - offset;
+            if (size < 0 || size > MaxEntrySize) {
+                throw new InvalidOperationException($"Invalid chat entry size: {size}.");
+            }
 
             if (size == 0) {
-                return result;
+                return Array.Empty<byte>();
             }
+
+            byte[] result = new byte[size];
 
             this._readBytes(new IntPtr(this.ChatLogPointers.LogStart + offset), result);
 
             return result;
+        }
+
+        private long ValidateLogPointers() {
+            long start = this.ChatLogPointers.LogStart;
+            long next = this.ChatLogPointers.LogNext;
+            long end = this.ChatLogPointers.LogEnd;
+            if (start <= 0 || start > next || next > end) {
+                throw new InvalidOperationException($"Invalid chat log vector: start=0x{start:X}, next=0x{next:X}, end=0x{end:X}.");
+            }
+
+            long length = end - start;
+            if (length > int.MaxValue) {
+                throw new InvalidOperationException($"Invalid chat log capacity: {length}.");
+            }
+
+            return length;
         }
     }
 }

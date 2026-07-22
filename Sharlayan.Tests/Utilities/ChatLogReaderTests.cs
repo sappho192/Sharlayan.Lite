@@ -19,7 +19,7 @@ namespace Sharlayan.Tests.Utilities {
         private const long LogStart = 0x3000;
 
         [Fact]
-        public void EnsureArrayIndexes_ReadsExactIndexBufferOnce() {
+        public void EnsureArrayIndexes_ReadsDynamicIndexBufferOnce() {
             int readCount = 0;
             IntPtr readAddress = IntPtr.Zero;
             int readLength = 0;
@@ -28,20 +28,22 @@ namespace Sharlayan.Tests.Utilities {
                     readCount++;
                     readAddress = address;
                     readLength = destination.Length;
-                    for (int i = 0; i < 1000; i++) {
+                    for (int i = 0; i < 3; i++) {
                         WriteInt32(destination, i, i * 10);
                     }
                 });
-            reader.ChatLogPointers = CreatePointers(currentArrayIndex: 0);
+            reader.ChatLogPointers = CreatePointers(currentArrayIndex: 0, capacity: 3);
 
-            reader.EnsureArrayIndexes();
+            int capacity = reader.GetArrayCapacity(out int currentArrayIndex);
+            reader.EnsureArrayIndexes(capacity);
 
             Assert.Equal(1, readCount);
             Assert.Equal(new IntPtr(IndexStart), readAddress);
-            Assert.Equal(4000, readLength);
-            Assert.Equal(1000, reader.Indexes.Count);
+            Assert.Equal(12, readLength);
+            Assert.Equal(3, reader.Indexes.Count);
+            Assert.Equal(0, currentArrayIndex);
             Assert.Equal(0, reader.Indexes[0]);
-            Assert.Equal(9990, reader.Indexes[999]);
+            Assert.Equal(20, reader.Indexes[2]);
         }
 
         [Fact]
@@ -85,9 +87,68 @@ namespace Sharlayan.Tests.Utilities {
             ChatLogResult result = reader.GetChatLog();
 
             Assert.Empty(result.ChatLogItems);
-            Assert.Equal(1, result.PreviousArrayIndex);
+            Assert.Equal(2, result.PreviousArrayIndex);
             Assert.Equal(34, result.PreviousOffset);
             Assert.Equal(1, indexReadCount);
+        }
+
+        [Fact]
+        public void GetChatLog_FirstPollAtZeroPrimesCursorAndNextPollReturnsFirstEntry() {
+            byte[] entry = CreateEntry("First entry");
+            int currentArrayIndex = 0;
+            ChatLogReader chatLogReader = CreateReader(
+                readPointers: _ => CreatePointers(currentArrayIndex, capacity: 3),
+                readBytes: (address, destination) => {
+                    if (address == new IntPtr(IndexStart)) {
+                        if (currentArrayIndex > 0) {
+                            WriteInt32(destination, 0, entry.Length);
+                        }
+                    }
+                    else {
+                        Buffer.BlockCopy(entry, 0, destination, 0, entry.Length);
+                    }
+                });
+            Reader reader = new Reader(chatLogReader);
+
+            ChatLogResult first = reader.GetChatLog();
+            currentArrayIndex = 1;
+            ChatLogResult second = reader.GetChatLog(first.PreviousArrayIndex, first.PreviousOffset);
+
+            Assert.Empty(first.ChatLogItems);
+            Assert.Equal(0, first.PreviousArrayIndex);
+            Assert.Equal("First entry", second.ChatLogItems.Single().Message);
+        }
+
+        [Fact]
+        public void GetChatLog_WrapImmediatelyAfterFirstPollUsesCurrentIndexAsCursor() {
+            byte[] tail = CreateEntry("Tail");
+            byte[] head = CreateEntry("Head");
+            int currentArrayIndex = 2;
+            ChatLogReader chatLogReader = CreateReader(
+                readPointers: _ => CreatePointers(currentArrayIndex, capacity: 3),
+                readBytes: (address, destination) => {
+                    if (address == new IntPtr(IndexStart)) {
+                        WriteInt32(destination, 0, head.Length);
+                        WriteInt32(destination, 1, 10);
+                        WriteInt32(destination, 2, 10 + tail.Length);
+                        return;
+                    }
+
+                    byte[] source = address == new IntPtr(LogStart + 10) ? tail : head;
+                    Buffer.BlockCopy(source, 0, destination, 0, source.Length);
+                });
+            Reader reader = new Reader(chatLogReader);
+
+            ChatLogResult first = reader.GetChatLog();
+            currentArrayIndex = 1;
+            ChatLogResult second = reader.GetChatLog(first.PreviousArrayIndex, first.PreviousOffset);
+
+            Assert.Empty(first.ChatLogItems);
+            Assert.Equal(2, first.PreviousArrayIndex);
+            Assert.Collection(
+                second.ChatLogItems,
+                item => Assert.Equal("Tail", item.Message),
+                item => Assert.Equal("Head", item.Message));
         }
 
         [Fact]
@@ -104,13 +165,14 @@ namespace Sharlayan.Tests.Utilities {
                 [LogStart] = head,
             };
             ChatLogReader chatLogReader = CreateReader(
-                readPointers: _ => CreatePointers(currentArrayIndex: 1),
+                readPointers: _ => CreatePointers(currentArrayIndex: 1, capacity: 4),
                 readBytes: (address, destination) => {
                     if (address == new IntPtr(IndexStart)) {
                         indexReadCount++;
                         WriteInt32(destination, 0, head.Length);
-                        WriteInt32(destination, 998, tailTwoStart);
-                        WriteInt32(destination, 999, tailTwoStart + tailTwo.Length);
+                        WriteInt32(destination, 1, tailStart);
+                        WriteInt32(destination, 2, tailTwoStart);
+                        WriteInt32(destination, 3, tailTwoStart + tailTwo.Length);
                         return;
                     }
 
@@ -121,7 +183,7 @@ namespace Sharlayan.Tests.Utilities {
             chatLogReader.ChatLogFirstRun = false;
             Reader reader = new Reader(chatLogReader);
 
-            ChatLogResult result = reader.GetChatLog(998, tailStart);
+            ChatLogResult result = reader.GetChatLog(2, tailStart);
 
             Assert.Collection(
                 result.ChatLogItems,
@@ -131,6 +193,255 @@ namespace Sharlayan.Tests.Utilities {
             Assert.Equal(1, result.PreviousArrayIndex);
             Assert.Equal(head.Length, result.PreviousOffset);
             Assert.Equal(1, indexReadCount);
+        }
+
+        [Theory]
+        [InlineData(-1)]
+        [InlineData(1048577)]
+        public void GetChatLog_InvalidEntrySizeReturnsEmptyResultAndRaisesException(int entryEnd) {
+            Exception raisedException = null;
+            int entryReadCount = 0;
+            ChatLogReader chatLogReader = CreateReader(
+                readPointers: _ => CreatePointers(currentArrayIndex: 1, capacity: 3),
+                readBytes: (address, destination) => {
+                    if (address == new IntPtr(IndexStart)) {
+                        WriteInt32(destination, 0, entryEnd);
+                    }
+                    else {
+                        entryReadCount++;
+                    }
+                },
+                raiseException: exception => raisedException = exception);
+            chatLogReader.ChatLogFirstRun = false;
+            Reader reader = new Reader(chatLogReader);
+
+            ChatLogResult result = reader.GetChatLog();
+
+            Assert.Empty(result.ChatLogItems);
+            Assert.IsType<InvalidOperationException>(raisedException);
+            Assert.Equal(0, entryReadCount);
+        }
+
+        [Fact]
+        public void GetChatLog_InvalidPointerVectorReturnsEmptyResultWithoutAllocatingIndexBuffer() {
+            Exception raisedException = null;
+            int readCount = 0;
+            ChatLogPointers pointers = CreatePointers(currentArrayIndex: 0);
+            pointers.OffsetArrayEnd = pointers.OffsetArrayStart + (65537L * sizeof(int));
+            ChatLogReader chatLogReader = CreateReader(
+                readPointers: _ => pointers,
+                readBytes: (_, _) => readCount++,
+                raiseException: exception => raisedException = exception);
+            Reader reader = new Reader(chatLogReader);
+
+            ChatLogResult result = reader.GetChatLog();
+
+            Assert.Empty(result.ChatLogItems);
+            Assert.IsType<InvalidOperationException>(raisedException);
+            Assert.Equal(0, readCount);
+        }
+
+        [Fact]
+        public void GetChatLog_InvalidLogVectorReturnsEmptyResultAndRaisesException() {
+            Exception raisedException = null;
+            ChatLogPointers pointers = CreatePointers(currentArrayIndex: 1);
+            pointers.LogNext = pointers.LogEnd + 1;
+            ChatLogReader chatLogReader = CreateReader(
+                readPointers: _ => pointers,
+                raiseException: exception => raisedException = exception);
+            Reader reader = new Reader(chatLogReader);
+
+            ChatLogResult result = reader.GetChatLog();
+
+            Assert.Empty(result.ChatLogItems);
+            Assert.IsType<InvalidOperationException>(raisedException);
+        }
+
+        [Fact]
+        public void GetChatLog_IndexPastLogPositionReturnsEmptyResultAndPreservesCursor() {
+            Exception raisedException = null;
+            ChatLogPointers pointers = CreatePointers(currentArrayIndex: 2, capacity: 3);
+            pointers.LogNext = pointers.LogStart + 20;
+            ChatLogReader chatLogReader = CreateReader(
+                readPointers: _ => pointers,
+                readBytes: (address, destination) => {
+                    if (address == new IntPtr(IndexStart)) {
+                        WriteInt32(destination, 0, 10);
+                        WriteInt32(destination, 1, 21);
+                    }
+                },
+                raiseException: exception => raisedException = exception);
+            chatLogReader.ChatLogFirstRun = false;
+            Reader reader = new Reader(chatLogReader);
+
+            ChatLogResult result = reader.GetChatLog(previousArrayIndex: 1, previousOffset: 10);
+
+            Assert.Empty(result.ChatLogItems);
+            Assert.Equal(1, result.PreviousArrayIndex);
+            Assert.Equal(10, result.PreviousOffset);
+            Assert.IsType<InvalidOperationException>(raisedException);
+        }
+
+        [Fact]
+        public void GetChatLog_InvalidHeadAfterWrapDiscardsTailAndPreservesCursor() {
+            byte[] tail = CreateEntry("Tail");
+            Exception raisedException = null;
+            ChatLogPointers pointers = CreatePointers(currentArrayIndex: 1, capacity: 3);
+            pointers.LogNext = pointers.LogStart + 20;
+            ChatLogReader chatLogReader = CreateReader(
+                readPointers: _ => pointers,
+                readBytes: (address, destination) => {
+                    if (address == new IntPtr(IndexStart)) {
+                        WriteInt32(destination, 0, 21);
+                        WriteInt32(destination, 1, 10);
+                        WriteInt32(destination, 2, 10 + tail.Length);
+                        return;
+                    }
+
+                    Buffer.BlockCopy(tail, 0, destination, 0, tail.Length);
+                },
+                raiseException: exception => raisedException = exception);
+            chatLogReader.ChatLogFirstRun = false;
+            Reader reader = new Reader(chatLogReader);
+
+            ChatLogResult result = reader.GetChatLog(previousArrayIndex: 2, previousOffset: 10);
+
+            Assert.Empty(result.ChatLogItems);
+            Assert.Equal(2, result.PreviousArrayIndex);
+            Assert.Equal(10, result.PreviousOffset);
+            Assert.IsType<InvalidOperationException>(raisedException);
+        }
+
+        [Fact]
+        public void GetChatLog_WhenDetachedReturnsEmptyResultWithoutReadingPointers() {
+            int pointerReadCount = 0;
+            ChatLogReader chatLogReader = CreateReader(
+                isAttached: () => false,
+                readPointers: _ => {
+                    pointerReadCount++;
+                    return CreatePointers(currentArrayIndex: 1);
+                });
+            Reader reader = new Reader(chatLogReader);
+
+            ChatLogResult result = reader.GetChatLog(previousArrayIndex: 4, previousOffset: 50);
+
+            Assert.Empty(result.ChatLogItems);
+            Assert.Equal(4, result.PreviousArrayIndex);
+            Assert.Equal(50, result.PreviousOffset);
+            Assert.Equal(0, pointerReadCount);
+        }
+
+        [Fact]
+        public void GetChatLog_InvalidChatAddressReturnsEmptyResultAndPreservesCursor() {
+            Exception raisedException = null;
+            ChatLogReader chatLogReader = CreateReader(
+                getChatLogAddress: () => new IntPtr(20),
+                raiseException: exception => raisedException = exception);
+            Reader reader = new Reader(chatLogReader);
+
+            ChatLogResult result = reader.GetChatLog(previousArrayIndex: 4, previousOffset: 50);
+
+            Assert.Empty(result.ChatLogItems);
+            Assert.Equal(4, result.PreviousArrayIndex);
+            Assert.Equal(50, result.PreviousOffset);
+            Assert.IsType<InvalidOperationException>(raisedException);
+        }
+
+        [Fact]
+        public void GetChatLog_CapacityChangeReprimesWithoutReturningHistory() {
+            int capacity = 4;
+            int currentArrayIndex = 3;
+            ChatLogReader chatLogReader = CreateReader(
+                readPointers: _ => CreatePointers(currentArrayIndex, capacity),
+                readBytes: (address, destination) => {
+                    if (address == new IntPtr(IndexStart)) {
+                        WriteInt32(destination, currentArrayIndex - 1, currentArrayIndex * 10);
+                    }
+                });
+            Reader reader = new Reader(chatLogReader);
+
+            ChatLogResult first = reader.GetChatLog();
+            capacity = 2;
+            currentArrayIndex = 1;
+            ChatLogResult second = reader.GetChatLog(first.PreviousArrayIndex, first.PreviousOffset);
+
+            Assert.Empty(first.ChatLogItems);
+            Assert.Empty(second.ChatLogItems);
+            Assert.Equal(1, second.PreviousArrayIndex);
+            Assert.Equal(10, second.PreviousOffset);
+        }
+
+        [Fact]
+        public void GetChatLog_CapacityGrowthPreservesCompatibleCursor() {
+            byte[] entry = CreateEntry("After growth");
+            int capacity = 2;
+            int currentArrayIndex = 1;
+            ChatLogReader chatLogReader = CreateReader(
+                readPointers: _ => CreatePointers(currentArrayIndex, capacity),
+                readBytes: (address, destination) => {
+                    if (address == new IntPtr(IndexStart)) {
+                        WriteInt32(destination, 0, 10);
+                        if (currentArrayIndex > 1) {
+                            WriteInt32(destination, 1, 10 + entry.Length);
+                        }
+                    }
+                    else {
+                        Buffer.BlockCopy(entry, 0, destination, 0, entry.Length);
+                    }
+                });
+            Reader reader = new Reader(chatLogReader);
+
+            ChatLogResult first = reader.GetChatLog();
+            capacity = 4;
+            currentArrayIndex = 2;
+            ChatLogResult second = reader.GetChatLog(first.PreviousArrayIndex, first.PreviousOffset);
+
+            Assert.Empty(first.ChatLogItems);
+            Assert.Equal("After growth", second.ChatLogItems.Single().Message);
+            Assert.Equal(2, second.PreviousArrayIndex);
+            Assert.Equal(10 + entry.Length, second.PreviousOffset);
+        }
+
+        [Fact]
+        public void GetChatLog_WhenProcessExitsDuringPollReturnsEmptyResultAndPreservesCursor() {
+            Exception raisedException = null;
+            ChatLogReader chatLogReader = CreateReader(
+                readPointers: _ => CreatePointers(currentArrayIndex: 2, capacity: 3),
+                readBytes: (_, _) => throw new InvalidOperationException("Process exited."),
+                raiseException: exception => raisedException = exception);
+            chatLogReader.ChatLogFirstRun = false;
+            Reader reader = new Reader(chatLogReader);
+
+            ChatLogResult result = reader.GetChatLog(previousArrayIndex: 1, previousOffset: 10);
+
+            Assert.Empty(result.ChatLogItems);
+            Assert.Equal(1, result.PreviousArrayIndex);
+            Assert.Equal(10, result.PreviousOffset);
+            Assert.Equal("Process exited.", raisedException?.Message);
+        }
+
+        [Theory]
+        [InlineData("Configured Name", "Configured Name")]
+        [InlineData(null, "UNRESOLVED")]
+        [InlineData("  ", "UNRESOLVED")]
+        public void GetChatLog_UsesConfiguredCharacterNameOrUnresolved(string configuredName, string expectedName) {
+            byte[] entry = CreateEntry("Message");
+            ChatLogReader chatLogReader = CreateReader(
+                readPointers: _ => CreatePointers(currentArrayIndex: 1, capacity: 3),
+                readBytes: (address, destination) => {
+                    if (address == new IntPtr(IndexStart)) {
+                        WriteInt32(destination, 0, entry.Length);
+                    }
+                    else {
+                        Buffer.BlockCopy(entry, 0, destination, 0, entry.Length);
+                    }
+                });
+            chatLogReader.ChatLogFirstRun = false;
+            Reader reader = new Reader(chatLogReader, () => configuredName);
+
+            ChatLogItem item = reader.GetChatLog().ChatLogItems.Single();
+
+            Assert.Equal(expectedName, item.PlayerCharacterName);
         }
 
         [Fact]
@@ -169,23 +480,29 @@ namespace Sharlayan.Tests.Utilities {
         }
 
         private static ChatLogReader CreateReader(
+            Func<bool> canRead = null,
+            Func<bool> isAttached = null,
+            Func<IntPtr> getChatLogAddress = null,
             Func<IntPtr, ChatLogPointers> readPointers = null,
-            Action<IntPtr, byte[]> readBytes = null) {
+            Action<IntPtr, byte[]> readBytes = null,
+            Action<Exception> raiseException = null) {
             return new ChatLogReader(
-                () => true,
-                () => true,
-                () => new IntPtr(0x1000),
+                canRead ?? (() => true),
+                isAttached ?? (() => true),
+                getChatLogAddress ?? (() => new IntPtr(0x1000)),
                 readPointers ?? (_ => CreatePointers(currentArrayIndex: 0)),
                 readBytes ?? ((_, _) => { }),
-                (_, _) => { });
+                (_, exception) => raiseException?.Invoke(exception));
         }
 
-        private static ChatLogPointers CreatePointers(int currentArrayIndex) {
+        private static ChatLogPointers CreatePointers(int currentArrayIndex, int capacity = 1000) {
             return new ChatLogPointers {
                 OffsetArrayStart = IndexStart,
                 OffsetArrayPos = IndexStart + currentArrayIndex * sizeof(int),
-                OffsetArrayEnd = IndexStart + 4000,
+                OffsetArrayEnd = IndexStart + capacity * sizeof(int),
                 LogStart = LogStart,
+                LogNext = LogStart + 2 * 1024 * 1024,
+                LogEnd = LogStart + 2 * 1024 * 1024,
             };
         }
 

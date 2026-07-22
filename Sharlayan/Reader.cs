@@ -9,11 +9,15 @@
 // --------------------------------------------------------------------------------------------------------------------
 
 namespace Sharlayan {
+    using System;
+
     using Sharlayan.Delegates;
     using Sharlayan.Utilities;
 
     public partial class Reader {
         private readonly ChatLogReader _chatLogReader;
+
+        private readonly Func<string> _characterName;
 
         private ChatLogWorkerDelegate _chatLogWorkerDelegate = new ChatLogWorkerDelegate();
 
@@ -21,6 +25,7 @@ namespace Sharlayan {
 
         public Reader(MemoryHandler memoryHandler) {
             this._memoryHandler = memoryHandler;
+            this._characterName = () => memoryHandler.Configuration.CharacterName;
 
             this._chatLogReader = new ChatLogReader(this._memoryHandler);
 
@@ -28,8 +33,9 @@ namespace Sharlayan {
             this._pcWorkerDelegate = new PCWorkerDelegate();
         }
 
-        internal Reader(ChatLogReader chatLogReader) {
+        internal Reader(ChatLogReader chatLogReader, Func<string> characterName = null) {
             this._chatLogReader = chatLogReader;
+            this._characterName = characterName ?? (() => null);
 
             this._chatLogWorkerDelegate = new ChatLogWorkerDelegate();
             this._pcWorkerDelegate = new PCWorkerDelegate();
