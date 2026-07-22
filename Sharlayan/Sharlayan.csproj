@@ -14,12 +14,12 @@
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<EnablePackageValidation>true</EnablePackageValidation>
 		<PackageValidationBaselineVersion>8.0.1</PackageValidationBaselineVersion>
-		<Version>8.0.1</Version>
+		<Version>9.1.2</Version>
 		<Company>SyndicatedLife</Company>
 		<Product>Sharlayan.Lite</Product>
 		<Description>This fork is a lightweight version of the original library and only has ChatLog functionality.</Description>
 		<Copyright>Copyright © 2007 - 2024 Ryan Wilson</Copyright>
-		<FileVersion>8.0.0.0</FileVersion>
+		<FileVersion>9.1.2.0</FileVersion>
 		<AssemblyVersion>8.0.0.0</AssemblyVersion>
 		<RootNamespace>Sharlayan</RootNamespace>
 		<PackageId>Sharlayan.Lite</PackageId>
@@ -39,7 +39,12 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<EmbeddedResource Include="Resources\HermesV2\embedded.json" LogicalName="Sharlayan.Resources.HermesV2.embedded.json" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<InternalsVisibleTo Include="Sharlayan.Tests" />
+		<InternalsVisibleTo Include="Sharlayan.LiveSmoke" />
 	</ItemGroup>
 
 	<PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|AnyCPU'">
@@ -92,10 +97,12 @@
 
 	<ItemGroup Condition="'$(TargetFramework)'=='net462'">
 		<Reference Include="System.Web" />
+		<Reference Include="System.Net.Http" />
 	</ItemGroup>
 
 	<ItemGroup Condition="'$(TargetFramework)'=='net48'">
 		<Reference Include="System.Web" />
+		<Reference Include="System.Net.Http" />
 	</ItemGroup>
 
 	<ItemGroup>

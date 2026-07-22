@@ -7,7 +7,7 @@ param(
 
     [string] $ExpectedPackageVersion,
 
-    [long] $MaximumBytes = 386101
+    [long] $MaximumBytes = 500000
 )
 
 $ErrorActionPreference = 'Stop'

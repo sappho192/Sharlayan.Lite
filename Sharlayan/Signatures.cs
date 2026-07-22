@@ -23,6 +23,10 @@ namespace Sharlayan {
 
         public const string CHATLOG_KEY = "CHATLOG";
 
+        public const string LAST_TALK_NAME_KEY = "LAST_TALK_NAME";
+
+        public const string LAST_TALK_TEXT_KEY = "LAST_TALK_TEXT";
+
         public const string ENMITY_COUNT_KEY = "ENMITY_COUNT";
 
         public const string ENMITYMAP_KEY = "ENMITYMAP";

@@ -15,11 +15,13 @@ namespace Sharlayan {
     using System.Diagnostics;
     using System.Runtime.InteropServices;
     using System.Text;
+    using System.Threading;
     using System.Threading.Tasks;
 
     using NLog;
 
     using Sharlayan.Models;
+    using Sharlayan.Models.Resources;
     using Sharlayan.Models.Structures;
     using Sharlayan.Resources;
     using Sharlayan.Utilities;
@@ -34,6 +36,7 @@ namespace Sharlayan {
         private static readonly Logger Logger = LogManager.GetCurrentClassLogger();
 
         private bool _ownsProcessHandle;
+        private readonly CancellationTokenSource _disposeCancellation = new CancellationTokenSource();
 
         internal ClearingArrayPool<byte> BufferPool = new ClearingArrayPool<byte>();
 
@@ -58,11 +61,10 @@ namespace Sharlayan {
 
             this.GetProcessModules();
 
-            this.Structures = GeneratedChatResources.CreateStructures();
             this.Scanner = new Scanner(this);
             this.Reader = new Reader(this);
 
-            this.InitializationTask = this.Scanner.LoadOffsetsAsync(GeneratedChatResources.CreateSignatures(), this.Configuration.ScanAllRegions);
+            this.InitializationTask = this.InitializeAsync();
         }
 
         public SharlayanConfiguration Configuration { get; set; }
@@ -82,16 +84,21 @@ namespace Sharlayan {
 
         public long ScanCount { get; set; }
 
-        public Scanner Scanner { get; }
+        public Scanner Scanner { get; private set; }
+
+        public ResourceInfo ResourceInfo { get; private set; }
 
         internal IntPtr ProcessHandle { get; set; }
 
         internal StructuresContainer Structures { get; set; } = new StructuresContainer();
 
+        internal TalkMemoryLayout TalkLayout { get; private set; }
+
         private List<ProcessModule> _systemModules { get; } = new List<ProcessModule>();
 
         public void Dispose() {
             try {
+                this._disposeCancellation.Cancel();
                 if (this.IsAttached && this._ownsProcessHandle && this.ProcessHandle != IntPtr.Zero) {
                     UnsafeNativeMethods.CloseHandle(this.ProcessHandle);
                 }
@@ -356,8 +363,58 @@ namespace Sharlayan {
         }
 
         internal Task ResolveMemoryStructures() {
-            this.Structures = GeneratedChatResources.CreateStructures();
             return Task.CompletedTask;
+        }
+
+        private async Task InitializeAsync() {
+            HermesV2ResourceProvider provider = new HermesV2ResourceProvider(this.Configuration);
+            IReadOnlyList<HermesManifestCandidate> candidates = await provider.GetCandidatesAsync(this._disposeCancellation.Token).ConfigureAwait(false);
+            List<string> scanFailures = new List<string>();
+            foreach (HermesManifestCandidate candidate in candidates) {
+                this._disposeCancellation.Token.ThrowIfCancellationRequested();
+                HermesMappedResources mapped = HermesV2ResourceMapper.Map(candidate.Manifest);
+                Scanner scanner = new Scanner(this);
+                try {
+                    await scanner.LoadOffsetsAsync(mapped.Signatures, this.Configuration.ScanAllRegions, raiseEvent: false).ConfigureAwait(false);
+                }
+                catch (Exception exception) when (this.IsAttached && !this._disposeCancellation.IsCancellationRequested) {
+                    scanFailures.Add(candidate.Info.Source + " scan failed: " + exception.GetType().Name);
+                    continue;
+                }
+                if (!scanner.Locations.ContainsKey(Signatures.CHATLOG_KEY)) {
+                    scanFailures.Add(candidate.Info.Source + " CHATLOG signature was not found");
+                    continue;
+                }
+
+                string fallback = candidate.Info.FallbackReason;
+                if (scanFailures.Count > 0) {
+                    string scanReason = string.Join("; ", scanFailures);
+                    fallback = string.IsNullOrEmpty(fallback) ? scanReason : fallback + "; " + scanReason;
+                }
+
+                this.Structures = mapped.Structures;
+                this.TalkLayout = mapped.TalkLayout;
+                this.Scanner = scanner;
+                this.ResourceInfo = new ResourceInfo(
+                    candidate.Info.Source,
+                    candidate.Info.ResourceRevision,
+                    candidate.Info.FcsCommit,
+                    candidate.Info.GeneratorCommit,
+                    candidate.Info.SchemaVersion,
+                    candidate.Info.ValidationStatus,
+                    fallback,
+                    scanner.Locations.Count);
+                Logger.Info(
+                    "Hermes v2 resource initialized: source={0}, revision={1}, fcs={2}, resolvedLocations={3}",
+                    this.ResourceInfo.Source,
+                    this.ResourceInfo.ResourceRevision,
+                    this.ResourceInfo.FcsCommit,
+                    this.ResourceInfo.ResolvedLocationCount);
+                this.RaiseMemoryLocationsFound(scanner.Locations, 0);
+                return;
+            }
+
+            throw new InvalidOperationException("No compatible Hermes v2 CHATLOG resource could be initialized. " + string.Join("; ", scanFailures));
         }
 
         protected internal virtual void RaiseException(Logger logger, Exception ex) {

@@ -62,7 +62,7 @@ namespace Sharlayan {
             _ = this.LoadOffsetsAsync(signatures, scanAllRegions);
         }
 
-        internal Task LoadOffsetsAsync(Signature[] signatures, bool scanAllRegions = false) {
+        internal Task LoadOffsetsAsync(Signature[] signatures, bool scanAllRegions = false, bool raiseEvent = true) {
             if (this._memoryHandler.Configuration.ProcessModel.Process == null) {
                 return Task.CompletedTask;
             }
@@ -98,7 +98,9 @@ namespace Sharlayan {
 
                         sw.Stop();
 
-                        this._memoryHandler.RaiseMemoryLocationsFound(this.Locations, sw.ElapsedMilliseconds);
+                        if (raiseEvent) {
+                            this._memoryHandler.RaiseMemoryLocationsFound(this.Locations, sw.ElapsedMilliseconds);
+                        }
                     }
                     finally {
                         this.IsScanning = false;

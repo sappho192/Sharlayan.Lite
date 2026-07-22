@@ -63,7 +63,6 @@ namespace Sharlayan.Tests.Resources {
             Assert.DoesNotContain(references, reference => reference.Name == "FFXIVClientStructs");
             Assert.DoesNotContain(references, reference => reference.Name == "InteropGenerator.Runtime");
             Assert.DoesNotContain(references, reference => reference.Name == "Lumina");
-            Assert.DoesNotContain(references, reference => reference.Name == "System.Net.Http");
         }
     }
 }

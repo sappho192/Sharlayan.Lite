@@ -9,6 +9,8 @@ using System.Runtime.InteropServices;
 using Sharlayan;
 using Sharlayan.Models;
 using Sharlayan.Models.ReadResults;
+using Sharlayan.Models.Resources;
+using Sharlayan.Resources;
 
 internal static class Program {
     private const int BufferSize = 0x1200;
@@ -31,7 +33,21 @@ internal static class Program {
                 CharacterName = ConfiguredCharacterName,
                 ProcessModel = new ProcessModel { Process = process },
             };
-            Signature signature = (await Signatures.Resolve(configuration)).Single(item => item.Key == Signatures.CHATLOG_KEY);
+            Signature signature;
+            if (!string.IsNullOrEmpty(options.ManifestPath)) {
+                byte[] manifestBytes = File.ReadAllBytes(options.ManifestPath);
+                HermesV2Manifest manifest = HermesV2ManifestParser.ParseManifest(
+                    manifestBytes,
+                    null,
+                    HermesV2ResourceProvider.GetClientVersion(),
+                    allowCandidate: true);
+                configuration.HermesV2ManifestOverride = manifestBytes;
+                signature = HermesV2ResourceMapper.Map(manifest).Signatures.Single(item => item.Key == Signatures.CHATLOG_KEY);
+                Console.WriteLine($"Manifest: {options.ManifestPath}, revision={HermesV2ManifestParser.CalculateRevision(manifestBytes)}");
+            }
+            else {
+                signature = (await Signatures.Resolve(configuration)).Single(item => item.Key == Signatures.CHATLOG_KEY);
+            }
             (int signatureMatches, int failedReads) = CountSignatureMatches(process, signature.Value);
             Console.WriteLine($"CHATLOG signature matches: {signatureMatches}, failed reads: {failedReads}");
             if (failedReads != 0) {
@@ -56,6 +72,9 @@ internal static class Program {
                     throw new InvalidOperationException("Handler initialization did not complete successfully.");
                 }
 
+                ResourceInfo resourceInfo = handler.ResourceInfo ?? throw new InvalidOperationException("Handler did not expose Hermes v2 resource diagnostics.");
+                Console.WriteLine($"Resource: source={resourceInfo.Source}, revision={resourceInfo.ResourceRevision}, fcs={resourceInfo.FcsCommit}, validation={resourceInfo.ValidationStatus}, resolvedLocations={resourceInfo.ResolvedLocationCount}");
+
                 if (!handler.Scanner.Locations.TryGetValue(Signatures.CHATLOG_KEY, out MemoryLocation? location)) {
                     throw new InvalidOperationException("CHATLOG location was not resolved.");
                 }
@@ -77,6 +96,19 @@ internal static class Program {
                 }
 
                 Console.WriteLine($"First poll: empty, cursor={firstPoll.PreviousArrayIndex}:{firstPoll.PreviousOffset}");
+
+                if (options.RequireTalk) {
+                    if (!handler.Reader.CanGetLastTalk()) {
+                        throw new InvalidOperationException("Talk locations were not resolved.");
+                    }
+
+                    TalkResult talk = handler.Reader.GetLastTalk();
+                    if (!talk.IsAvailable || string.IsNullOrEmpty(talk.Text)) {
+                        throw new InvalidOperationException("No readable standard Talk value is available. Open an NPC Talk and retry.");
+                    }
+
+                    Console.WriteLine($"Talk: available, nameUtf16Length={talk.Name.Length}, textUtf16Length={talk.Text.Length}");
+                }
 
                 if (options.AttachOnly) {
                     Console.WriteLine("LIVE ATTACH PASS");
@@ -263,6 +295,10 @@ internal static class Program {
 
         public int? ProcessId { get; private set; }
 
+        public string? ManifestPath { get; private set; }
+
+        public bool RequireTalk { get; private set; }
+
         public static Options Parse(string[] args) {
             Options options = new Options();
             for (int index = 0; index < args.Length; index++) {
@@ -281,6 +317,12 @@ internal static class Program {
                         break;
                     case "--process-id":
                         options.ProcessId = ReadPositiveInt(args, ref index);
+                        break;
+                    case "--manifest":
+                        options.ManifestPath = ReadString(args, ref index);
+                        break;
+                    case "--require-talk":
+                        options.RequireTalk = true;
                         break;
                     default:
                         throw new ArgumentException($"Unknown argument '{args[index]}'.");
@@ -305,6 +347,14 @@ internal static class Program {
             }
 
             return value;
+        }
+
+        private static string ReadString(string[] args, ref int index) {
+            if (++index >= args.Length || string.IsNullOrWhiteSpace(args[index])) {
+                throw new ArgumentException("Expected a non-empty argument value.");
+            }
+
+            return Path.GetFullPath(args[index]);
         }
     }
 }

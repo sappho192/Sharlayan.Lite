@@ -14,6 +14,7 @@ namespace Sharlayan {
 
     using Sharlayan.Enums;
     using Sharlayan.Models;
+    using Sharlayan.Models.Resources;
 
     public class SharlayanConfiguration {
         [Obsolete("Chat resources are embedded at build time; APIBaseURL is no longer used.")]
@@ -27,6 +28,11 @@ namespace Sharlayan {
         [Obsolete("Chat resources are versioned with the package; PatchVersion is no longer used.")]
         public string PatchVersion { get; set; } = "latest";
         public ProcessModel ProcessModel { get; set; }
+        public ResourceMode ResourceMode { get; set; } = ResourceMode.EmbeddedOnly;
+        public Uri HermesV2LatestUri { get; set; } = new Uri("https://hermes.sapphosound.com/v2/latest.json");
+        public string ResourceCacheDirectory { get; set; }
+        public TimeSpan ResourceRequestTimeout { get; set; } = TimeSpan.FromSeconds(5);
+        internal byte[] HermesV2ManifestOverride { get; set; }
         public bool ScanAllRegions { get; set; } = false;
         [Obsolete("Chat resources are embedded at build time; UseLocalCache is no longer used.")]
         public bool UseLocalCache { get; set; } = true;

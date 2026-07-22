@@ -10,9 +10,9 @@ This fork is a lightweight version of the original library and only has memory s
 
 # How do I use it and what comes back?
 
-- .NET CLI: `dotnet add package Sharlayan.Lite --version 8.0.1`
-- Nuget Package Manager: `Install-Package Sharlayan.Lite -Version 8.0.1`
-- PackageReference: `<PackageReference Include="Sharlayan.Lite" Version="8.0.1" />`
+- .NET CLI: `dotnet add package Sharlayan.Lite --version 9.1.2`
+- Nuget Package Manager: `Install-Package Sharlayan.Lite -Version 9.1.2`
+- PackageReference: `<PackageReference Include="Sharlayan.Lite" Version="9.1.2" />`
 
 That's the basic of it. For actual instantiation it works as follows:
 
@@ -20,18 +20,13 @@ That's the basic of it. For actual instantiation it works as follows:
 using Sharlayan;
 using Sharlayan.Enums;
 using Sharlayan.Models;
+using Sharlayan.Models.Resources;
 
 // DX11
 Process[] processes = Process.GetProcessesByName("ffxiv_dx11");
 if (processes.Length > 0)
 {
-    // supported: Global, Chinese, Korean
-    GameRegion gameRegion = GameRegion.Global;
     GameLanguage gameLanguage = GameLanguage.English;
-	// whether to always hit API on start to get the latest sigs based on patchVersion, or use the local json cache (if the file doesn't exist, API will be hit)
-	bool useLocalCache = true;
-	// patchVersion of game, or latest
-	string patchVersion = "latest";
     Process process = processes[0];
     ProcessModel processModel = new ProcessModel {
         Process = process
@@ -39,13 +34,21 @@ if (processes.Length > 0)
     SharlayanConfiguration configuration = new SharlayanConfiguration {
         ProcessModel = processModel,
         GameLanguage = gameLanguage,
-        GameRegion = gameRegion,
-        PatchVersion = patchVersion,
-        UseLocalCache = useLocalCache
+        ResourceMode = ResourceMode.RemotePreferred,
+        ResourceCacheDirectory = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "MyApp")
     };
     MemoryHandler memoryHandler = SharlayanMemoryManager.Instance.AddHandler(configuration);
 }
 ```
+
+`ResourceMode` defaults to `EmbeddedOnly`, so existing consumers do not start network requests merely by
+updating the package. `RemotePreferred` validates Hermes v2 remote bytes first, then falls back to the last
+verified cache and finally the package's embedded manifest. Initialization uses one manifest revision for
+both the CHATLOG signature/structure and standard Talk offsets.
+The default latest pointer is `https://hermes.sapphosound.com/v2/latest.json`, under the Hermes v2 public
+base `https://hermes.sapphosound.com/v2/`.
 
 The memory module is now instantiated and is ready to read data. When switch processes you should call:
 
@@ -94,11 +97,28 @@ public class ChatLogResult
 }
 ```
 
+## Standard NPC Talk Reading
+
+```csharp
+if (memoryHandler.Reader.CanGetLastTalk()) {
+    TalkResult talk = memoryHandler.Reader.GetLastTalk();
+    if (talk.IsAvailable) {
+        Console.WriteLine($"{talk.Name}: {talk.Text}");
+    }
+}
+```
+
+The result represents FCS `LastTalkName` and `LastTalkText`. It does not claim that the Talk window is
+currently open. Applications should baseline the first value after attach before treating changes as new
+dialogue.
+
+The selected resource can be inspected through `memoryHandler.ResourceInfo`, including its source,
+revision, FCS/generator commits, validation status, resolved location count, and fallback reason.
+
 # Roll your own app?
 
-If you want to add your own signatures to scan for you can modify the json file directly that's automatically downloaded/saved into your application directory.
-
-You can also override the built in like so:
+If you want to scan application-specific signatures, register them explicitly after the built-in Hermes v2
+initialization. Do not modify a verified Hermes cache file.
 
 ```csharp
 SharlayanConfiguration configuration = new SharlayanConfiguration {
