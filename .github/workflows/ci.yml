@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["min-chat"]
+  pull_request:
+    branches: ["min-chat"]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install .NET SDKs
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            7.0.x
+            6.0.x
+
+      - name: Restore
+        run: dotnet restore Sharlayan.sln
+
+      - name: Build all target frameworks
+        run: dotnet build Sharlayan.sln --configuration Release --no-restore --nologo -p:GeneratePackageOnBuild=false
+
+      - name: Test
+        run: dotnet test Sharlayan.Tests/Sharlayan.Tests.csproj --configuration Release --no-build --no-restore --nologo
