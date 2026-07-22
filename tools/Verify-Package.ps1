@@ -7,7 +7,7 @@ param(
 
     [string] $ExpectedPackageVersion,
 
-    [long] $MaximumBytes = 500000
+    [long] $MaximumBytes = 600000
 )
 
 $ErrorActionPreference = 'Stop'
@@ -86,6 +86,7 @@ try {
         'lib/net6.0/Sharlayan.dll',
         'lib/net7.0/Sharlayan.dll',
         'lib/net8.0/Sharlayan.dll',
+        'lib/net10.0/Sharlayan.dll',
         'THIRD-PARTY-NOTICES.md',
         'Logo.png'
     )
@@ -145,7 +146,8 @@ try {
         'lib/net48/Sharlayan.pdb',
         'lib/net6.0/Sharlayan.pdb',
         'lib/net7.0/Sharlayan.pdb',
-        'lib/net8.0/Sharlayan.pdb'
+        'lib/net8.0/Sharlayan.pdb',
+        'lib/net10.0/Sharlayan.pdb'
     )
 
     foreach ($requiredSymbol in $requiredSymbols) {

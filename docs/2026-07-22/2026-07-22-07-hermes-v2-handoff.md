@@ -105,11 +105,11 @@ live-smoke 전용 `--manifest` override에서만 사용할 수 있다.
 
 ```text
 Release multi-target build: PASS
-  net462, net48, net6.0, net7.0, net8.0
+  net462, net48, net6.0, net7.0, net8.0, net10.0
 Warnings: 0
-Sharlayan.Tests: 60 PASS, 0 FAIL
+Sharlayan.Tests: 60 PASS on net8.0 and net10.0, 0 FAIL
 Sharlayan.Lite 9.1.2 pack: PASS
-Package verification: PASS, 457,954 bytes combined
+Package verification: PASS, 540,315 bytes combined
 ```
 
 재현 명령:

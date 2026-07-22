@@ -376,6 +376,9 @@ upstream의 `net10.0` 전환은 전체 FCS/Lumina 재구축에 따른 선택이�
 
 첫 마이그레이션에서는 `net462;net48;net6.0;net7.0;net8.0`을 유지한다. 생성 도구만 `net10.0`을 사용한다. 이렇게 해야 리소스 변경과 소비자 호환성 변경을 한 번에 섞지 않을 수 있다.
 
+2026-07-23 후속 결정으로 Sharlayan.Lite 9.1.2 release 범위에 runtime `net10.0` target도
+추가했다. 현재 package 지원 범위는 `net462;net48;net6.0;net7.0;net8.0;net10.0`이다.
+
 다음 major 릴리스에서는 별도 조사 후 지원 대상을 줄인다.
 
 - `net6.0`과 `net7.0`은 지원 종료 상태이므로 제거 후보이다.

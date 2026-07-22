@@ -25,7 +25,7 @@ https://github.com/sappho192/ffxiv-hermes/blob/main/V2_IMPLEMENTATION_PLAN.md
 - CHATLOG signature와 structure를 반드시 같은 manifest revision에서 가져온다.
 - `UIModule.LastTalkName`과 `UIModule.LastTalkText`를 안전하게 읽는 API를 제공한다.
 - IronworksTranslator가 `Signature`, pointer path 및 raw memory layout을 직접 다루지 않게 한다.
-- 현재 지원하는 `net462`, `net48`, `net6.0`, `net7.0`, `net8.0`을 유지한다.
+- 현재 지원하는 `net462`, `net48`, `net6.0`, `net7.0`, `net8.0`을 유지하고 `net10.0`을 추가한다.
 - public API와 기존 초기화 event의 호환성을 가능한 한 유지한다.
 - 선택된 resource source와 revision을 진단할 수 있게 한다.
 

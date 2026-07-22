@@ -2,6 +2,8 @@
 
 This fork is a lightweight version of the original library and only has memory search & ChatLog functionality.
 
+Supported targets: .NET Framework 4.6.2 and 4.8, plus .NET 6, 7, 8, and 10.
+
 # Nuget Package list
 
 | Package       | repo                                                                                                                            | description  |

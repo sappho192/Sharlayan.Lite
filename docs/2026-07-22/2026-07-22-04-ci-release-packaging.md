@@ -11,8 +11,8 @@ CI와 수동 release가 동일한 generate, build, test, pack, verify 순서를 
 1. recursive submodule checkout
 2. FCS 기반 chat resource 생성 및 freshness 검사
 3. solution restore
-4. 5개 target framework Release build
-5. `Sharlayan.Tests` 실행
+4. 6개 target framework Release build
+5. `Sharlayan.Tests`를 `net8.0`과 `net10.0`에서 실행
 6. 명시적 `dotnet pack --no-build`
 7. NuGet 8.0.1 baseline package API 호환성 검사
 8. package contents와 크기 검사
@@ -25,14 +25,16 @@ CI와 수동 release가 동일한 generate, build, test, pack, verify 순서를 
 `dotnet pack`은 NuGet 8.0.1 baseline과 package API 호환성을 검사한다. 이후 `tools/Verify-Package.ps1`은 다음 조건을 검사한다.
 
 - package 디렉터리에 ID와 version이 일치하는 `.nupkg`와 `.snupkg`가 각각 하나 있음
-- `net462`, `net48`, `net6.0`, `net7.0`, `net8.0`용 `Sharlayan.dll` 포함
-- 5개 target framework용 symbol PDB 포함
+- `net462`, `net48`, `net6.0`, `net7.0`, `net8.0`, `net10.0`용 `Sharlayan.dll` 포함
+- 6개 target framework용 symbol PDB 포함
 - `THIRD-PARTY-NOTICES.md`와 `Logo.png` 포함
 - 의도하지 않은 runtime assembly 부재
 - FCS, InteropGenerator, Lumina, System.Net.Http runtime dependency 부재
-- 기존 8.0.1 package 351,001바이트 대비 main/symbol 합산 10% 상한인 386,101바이트 이하
+- main/symbol 합산 600,000바이트 이하
 
 첫 표준 pack 결과의 main package 크기는 236,061바이트다. `8.1.0-beta.1` 검증 산출물의 main/symbol 합산 크기는 324,646바이트다. PDB와 source symbol은 별도 `.snupkg`로 분리되므로 기존 symbols package rename script는 사용하지 않는다.
+
+`net10.0` 추가 후 9.1.2 검증 산출물의 main/symbol 합산 크기는 540,315바이트다.
 
 로컬 검증 명령은 다음과 같다.
 
