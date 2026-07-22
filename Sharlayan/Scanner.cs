@@ -70,33 +70,42 @@ namespace Sharlayan {
                     Stopwatch sw = new Stopwatch();
                     sw.Start();
 
-                    if (scanAllRegions) {
-                        this.LoadRegions();
-                    }
-
-                    List<Signature> scanable = signatures.ToList();
-                    if (scanable.Any()) {
-                        foreach (Signature signature in scanable) {
-                            if (signature.Value == string.Empty) {
-                                // doesn't need a signature scan
-                                this.Locations[signature.Key] = new MemoryLocation(signature, this._memoryHandler);
-                                continue;
-                            }
-
-                            signature.Value = signature.Value.Replace("*", "?"); // allows either ? or * to be used as wildcard
+                    try {
+                        if (scanAllRegions) {
+                            this.LoadRegions();
                         }
 
-                        scanable.RemoveAll(a => this.Locations.ContainsKey(a.Key));
+                        List<Signature> scanable = signatures.ToList();
+                        if (scanable.Any()) {
+                            foreach (Signature signature in scanable) {
+                                if (signature.Value == string.Empty) {
+                                    // doesn't need a signature scan
+                                    this.Locations[signature.Key] = new MemoryLocation(signature, this._memoryHandler);
+                                    continue;
+                                }
 
-                        this.FindExtendedSignatures(scanable, scanAllRegions);
+                                signature.Value = signature.Value.Replace("*", "?"); // allows either ? or * to be used as wildcard
+                            }
+
+                            scanable.RemoveAll(a => this.Locations.ContainsKey(a.Key));
+
+                            this.FindExtendedSignatures(scanable, scanAllRegions);
+                        }
+
+                        sw.Stop();
+
+                        this._memoryHandler.RaiseMemoryLocationsFound(this.Locations, sw.ElapsedMilliseconds);
                     }
-
-                    sw.Stop();
-
-                    this._memoryHandler.RaiseMemoryLocationsFound(this.Locations, sw.ElapsedMilliseconds);
-
-                    this.IsScanning = false;
-                });
+                    finally {
+                        this.IsScanning = false;
+                    }
+                })
+                .ContinueWith(
+                    task => {
+                        Logger.Error(task.Exception, "Signature scan faulted.");
+                        this._memoryHandler.RaiseException(Logger, task.Exception);
+                    },
+                    TaskContinuationOptions.OnlyOnFaulted);
         }
 
         private static int[] BuildBadShiftTable(byte[] pattern) {
@@ -129,11 +138,16 @@ namespace Sharlayan {
                 return;
             }
 
+            byte[][] patternBytes = new byte[notFound.Count][];
+            for (int i = 0; i < notFound.Count; i++) {
+                patternBytes[i] = SignatureToByte(notFound[i].Value, WildCardChar);
+            }
+
             IntPtr baseAddress = this._memoryHandler.Configuration.ProcessModel.Process.MainModule.BaseAddress;
             IntPtr searchEnd = IntPtr.Add(baseAddress, this._memoryHandler.Configuration.ProcessModel.Process.MainModule.ModuleMemorySize);
             IntPtr searchStart = baseAddress;
 
-            this.ResolveLocations(baseAddress, searchStart, searchEnd, ref notFound);
+            this.ResolveLocations(baseAddress, searchStart, searchEnd, ref notFound, ref patternBytes);
 
             if (!scanAllRegions) {
                 return;
@@ -144,11 +158,11 @@ namespace Sharlayan {
                 searchEnd = new IntPtr(baseAddress.ToInt64() + region.RegionSize.ToInt64());
                 searchStart = baseAddress;
 
-                this.ResolveLocations(baseAddress, searchStart, searchEnd, ref notFound);
+                this.ResolveLocations(baseAddress, searchStart, searchEnd, ref notFound, ref patternBytes);
             }
         }
 
-        private int FindSuperSignature(byte[] buffer, byte[] pattern) {
+        internal static int FindSuperSignature(byte[] buffer, byte[] pattern) {
             if (pattern.Length > buffer.Length) {
                 return -1;
             }
@@ -185,9 +199,6 @@ namespace Sharlayan {
                     if (!this._memoryHandler.IsSystemModule(info.BaseAddress) && (info.State & MemCommit) != 0 && (info.Protect & Writable) != 0 && (info.Protect & PageGuard) == 0) {
                         this._regions.Add(info);
                     }
-                    else {
-                        this._memoryHandler.RaiseException(Logger, new Exception(info.ToString()));
-                    }
 
                     unchecked {
                         switch (IntPtr.Size) {
@@ -206,9 +217,10 @@ namespace Sharlayan {
             }
         }
 
-        private void ResolveLocations(IntPtr baseAddress, IntPtr searchStart, IntPtr searchEnd, ref List<Signature> unresolvedSignatures) {
+        private void ResolveLocations(IntPtr baseAddress, IntPtr searchStart, IntPtr searchEnd, ref List<Signature> unresolvedSignatures, ref byte[][] unresolvedPatterns) {
             byte[] buffer = new byte[BufferSize];
-            List<Signature> temp = new List<Signature>();
+            List<Signature> tempSignatures = new List<Signature>();
+            List<byte[]> tempPatterns = new List<byte[]>();
             int regionCount = 0;
 
             while (searchStart.ToInt64() < searchEnd.ToInt64()) {
@@ -219,10 +231,12 @@ namespace Sharlayan {
                     }
 
                     if (UnsafeNativeMethods.ReadProcessMemory(this._memoryHandler.ProcessHandle, searchStart, buffer, regionSize, out IntPtr _)) {
-                        foreach (Signature unresolvedSignature in unresolvedSignatures) {
-                            int index = this.FindSuperSignature(buffer, this.SignatureToByte(unresolvedSignature.Value, WildCardChar));
+                        for (int i = 0; i < unresolvedSignatures.Count; i++) {
+                            Signature unresolvedSignature = unresolvedSignatures[i];
+                            int index = FindSuperSignature(buffer, unresolvedPatterns[i]);
                             if (index < 0) {
-                                temp.Add(unresolvedSignature);
+                                tempSignatures.Add(unresolvedSignature);
+                                tempPatterns.Add(unresolvedPatterns[i]);
                                 continue;
                             }
 
@@ -236,8 +250,10 @@ namespace Sharlayan {
                             }
                         }
 
-                        unresolvedSignatures = new List<Signature>(temp);
-                        temp.Clear();
+                        unresolvedSignatures = new List<Signature>(tempSignatures);
+                        unresolvedPatterns = tempPatterns.ToArray();
+                        tempSignatures.Clear();
+                        tempPatterns.Clear();
                     }
 
                     regionCount++;
@@ -249,7 +265,7 @@ namespace Sharlayan {
             }
         }
 
-        private byte[] SignatureToByte(string signature, byte wildcard) {
+        internal static byte[] SignatureToByte(string signature, byte wildcard) {
             byte[] pattern = new byte[signature.Length / 2];
             int[] hexTable = {
                 0x00,

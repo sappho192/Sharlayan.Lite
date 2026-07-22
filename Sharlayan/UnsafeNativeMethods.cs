@@ -14,7 +14,11 @@ namespace Sharlayan {
     using System.Text;
 
     public static class UnsafeNativeMethods {
+        [Flags]
         public enum ProcessAccessFlags {
+            PROCESS_VM_READ = 0x00000010,
+            PROCESS_QUERY_INFORMATION = 0x00000400,
+            PROCESS_VM_READ_QUERY = PROCESS_VM_READ | PROCESS_QUERY_INFORMATION,
             PROCESS_VM_ALL = 0x001F0FFF,
         }
 

@@ -255,7 +255,7 @@ upstream에는 mapper와 signature extractor 테스트가 있지만 chat parser�
 - entry 결과 배열에 process memory를 직접 읽는다.
 - LINQ 기반 byte slicing과 불필요한 배열 복사를 제거한다.
 - 구분자 없는 공개 채팅과 잘린 control payload의 경계를 검사한다.
-- `GetUInt64` 변환, `GetStructure<T>` handle/해제, `CloseHandle` 선언을 수정한다.
+- `GetUInt64` 변환과 `GetStructure<T>` handle/해제를 수정한다. Public `CloseHandle`의 기존 `int` 반환은 Win32 `BOOL`과 같은 32비트 폭이며 minor 릴리스 ABI 유지를 위해 변경하지 않는다.
 - 먼저 `PROCESS_VM_READ | PROCESS_QUERY_INFORMATION`으로 연결하고 필요할 때만 기존 권한으로 fallback한다.
 - primitive read buffer 재사용과 count 제한 `Peek` overload를 반영한다.
 - scanner의 pattern 변환을 시그니처당 한 번 수행한다.
@@ -415,8 +415,8 @@ upstream의 `net10.0` 전환은 전체 FCS/Lumina 재구축에 따른 선택이�
 - [x] chat parser와 cleaner 테스트 추가
 - [x] chat reader ring buffer와 동시성 테스트 추가
 - [x] PR #116 chat 변경 수동 이식
-- [ ] PR #116 memory/scanner/native 변경 수동 이식
-- [ ] 초기화 task 오류 관찰 적용
+- [x] PR #116 memory/scanner/native 변경 수동 이식
+- [x] 초기화 task 오류 관찰 적용
 - [ ] FCS submodule pin 추가
 - [ ] chat resource generator 구현
 - [ ] generated resource freshness CI 추가

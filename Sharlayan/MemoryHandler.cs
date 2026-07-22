@@ -13,7 +13,6 @@ namespace Sharlayan {
     using System.Collections.Concurrent;
     using System.Collections.Generic;
     using System.Diagnostics;
-    using System.Linq;
     using System.Runtime.InteropServices;
     using System.Text;
     using System.Threading.Tasks;
@@ -35,19 +34,25 @@ namespace Sharlayan {
 
         private bool _isNewInstance = true;
 
+        private bool _ownsProcessHandle;
+
         internal ClearingArrayPool<byte> BufferPool = new ClearingArrayPool<byte>();
 
         public MemoryHandler(SharlayanConfiguration configuration) {
             this.Configuration = configuration;
-            try {
-                this.ProcessHandle = UnsafeNativeMethods.OpenProcess(UnsafeNativeMethods.ProcessAccessFlags.PROCESS_VM_ALL, false, (uint)this.Configuration.ProcessModel.ProcessID);
+            this.ProcessHandle = UnsafeNativeMethods.OpenProcess(UnsafeNativeMethods.ProcessAccessFlags.PROCESS_VM_READ_QUERY, false, (uint) this.Configuration.ProcessModel.ProcessID);
+            this._ownsProcessHandle = this.ProcessHandle != IntPtr.Zero;
+            if (this.ProcessHandle == IntPtr.Zero) {
+                this.ProcessHandle = UnsafeNativeMethods.OpenProcess(UnsafeNativeMethods.ProcessAccessFlags.PROCESS_VM_ALL, false, (uint) this.Configuration.ProcessModel.ProcessID);
+                this._ownsProcessHandle = this.ProcessHandle != IntPtr.Zero;
             }
-            catch (Exception) {
+
+            if (this.ProcessHandle == IntPtr.Zero) {
                 this.ProcessHandle = this.Configuration.ProcessModel.Process.Handle;
+                this._ownsProcessHandle = false;
             }
-            finally {
-                this.IsAttached = true;
-            }
+
+            this.IsAttached = this.ProcessHandle != IntPtr.Zero;
 
             this.Configuration.ProcessModel.Process.EnableRaisingEvents = true;
             this.Configuration.ProcessModel.Process.Exited += this.Process_OnExited;
@@ -63,19 +68,36 @@ namespace Sharlayan {
                 Task.Run(
                     async () => {
                         await this.ResolveMemoryStructures();
-                    });
+                    })
+                    .ContinueWith(
+                        task => {
+                            Logger.Error(task.Exception, "Background structure resolution faulted.");
+                            this.RaiseException(Logger, task.Exception);
+                        },
+                        TaskContinuationOptions.OnlyOnFaulted);
             }
 
             Task.Run(
                 async () => {
                     Signature[] signatures = await Signatures.Resolve(this.Configuration);
                     this.Scanner.LoadOffsets(signatures, this.Configuration.ScanAllRegions);
-                });
+                })
+                .ContinueWith(
+                    task => {
+                        Logger.Error(task.Exception, "Background signature resolution faulted.");
+                        this.RaiseException(Logger, task.Exception);
+                    },
+                    TaskContinuationOptions.OnlyOnFaulted);
         }
 
         public SharlayanConfiguration Configuration { get; set; }
 
-        internal bool IsAttached { get; set; }
+        private volatile bool _isAttached;
+
+        internal bool IsAttached {
+            get => this._isAttached;
+            set => this._isAttached = value;
+        }
 
         public Reader Reader { get; set; }
 
@@ -91,16 +113,18 @@ namespace Sharlayan {
 
         public void Dispose() {
             try {
-                if (this.IsAttached) {
+                if (this.IsAttached && this._ownsProcessHandle && this.ProcessHandle != IntPtr.Zero) {
                     UnsafeNativeMethods.CloseHandle(this.ProcessHandle);
                 }
             }
-            catch (Exception ex) {
+            catch (Exception) {
                 // IGNORED
             }
             finally {
                 this.IsAttached = false;
+                this.ProcessHandle = IntPtr.Zero;
                 this.RaiseMemoryHandlerDisposed();
+                GC.SuppressFinalize(this);
             }
         }
 
@@ -114,10 +138,15 @@ namespace Sharlayan {
 
         public event MemoryLocationsFoundEvent OnMemoryLocationsFound = delegate { };
 
+        [ThreadStatic]
+        private static byte[] _singleByteBuffer;
+
         public byte GetByte(IntPtr address, long offset = 0) {
-            byte[] data = new byte[1];
-            this.Peek(new IntPtr(address.ToInt64() + offset), data);
-            return data[0];
+            if (_singleByteBuffer == null) {
+                _singleByteBuffer = new byte[1];
+            }
+
+            return this.Peek(new IntPtr(address.ToInt64() + offset), _singleByteBuffer) ? _singleByteBuffer[0] : (byte) 0;
         }
 
         public byte[] GetByteArray(IntPtr address, int length) {
@@ -130,22 +159,41 @@ namespace Sharlayan {
             this.Peek(address, destination);
         }
 
+        public void GetByteArray(IntPtr address, byte[] destination, int count) {
+            this.Peek(address, destination, count);
+        }
+
+        [ThreadStatic]
+        private static byte[] _twoByteBuffer;
+
+        [ThreadStatic]
+        private static byte[] _fourByteBuffer;
+
+        [ThreadStatic]
+        private static byte[] _eightByteBuffer;
+
         public short GetInt16(IntPtr address, long offset = 0) {
-            byte[] value = new byte[2];
-            this.Peek(new IntPtr(address.ToInt64() + offset), value);
-            return SharlayanBitConverter.TryToInt16(value, 0);
+            if (_twoByteBuffer == null) {
+                _twoByteBuffer = new byte[2];
+            }
+
+            return this.Peek(new IntPtr(address.ToInt64() + offset), _twoByteBuffer) ? SharlayanBitConverter.TryToInt16(_twoByteBuffer, 0) : (short) 0;
         }
 
         public int GetInt32(IntPtr address, long offset = 0) {
-            byte[] value = new byte[4];
-            this.Peek(new IntPtr(address.ToInt64() + offset), value);
-            return SharlayanBitConverter.TryToInt32(value, 0);
+            if (_fourByteBuffer == null) {
+                _fourByteBuffer = new byte[4];
+            }
+
+            return this.Peek(new IntPtr(address.ToInt64() + offset), _fourByteBuffer) ? SharlayanBitConverter.TryToInt32(_fourByteBuffer, 0) : 0;
         }
 
         public long GetInt64(IntPtr address, long offset = 0) {
-            byte[] value = new byte[8];
-            this.Peek(new IntPtr(address.ToInt64() + offset), value);
-            return SharlayanBitConverter.TryToInt64(value, 0);
+            if (_eightByteBuffer == null) {
+                _eightByteBuffer = new byte[8];
+            }
+
+            return this.Peek(new IntPtr(address.ToInt64() + offset), _eightByteBuffer) ? SharlayanBitConverter.TryToInt64(_eightByteBuffer, 0) : 0;
         }
 
         public long GetInt64FromBytes(byte[] source, int index = 0) {
@@ -162,72 +210,84 @@ namespace Sharlayan {
         }
 
         public string GetString(IntPtr address, long offset = 0, int size = 256) {
-            byte[] bytes = new byte[size];
-            this.Peek(new IntPtr(address.ToInt64() + offset), bytes);
-            int realSize = 0;
-            for (int i = 0; i < size; i++) {
-                if (bytes[i] != 0) {
-                    continue;
+            byte[] bytes = this.BufferPool.Rent(size);
+            try {
+                if (!this.Peek(new IntPtr(address.ToInt64() + offset), bytes, size)) {
+                    return string.Empty;
                 }
 
-                realSize = i;
-                break;
+                return DecodeString(bytes, 0, size);
             }
-
-            Array.Resize(ref bytes, realSize);
-            return Encoding.UTF8.GetString(bytes);
+            finally {
+                this.BufferPool.Return(bytes);
+            }
         }
 
         public string GetStringFromBytes(byte[] source, int offset = 0, int size = 256) {
-            if (!source.Any()) {
-                return string.Empty;
+            return DecodeString(source, offset, size);
+        }
+
+        internal static string DecodeString(byte[] source, int offset, int size) {
+            if (source == null) {
+                throw new ArgumentNullException(nameof(source));
             }
 
-            int safeSize = source.Length - offset;
-            if (safeSize < size) {
-                size = safeSize;
+            if (offset < 0 || offset > source.Length) {
+                throw new ArgumentOutOfRangeException(nameof(offset));
             }
 
-            byte[] bytes = new byte[size];
-            Array.Copy(source, offset, bytes, 0, size);
-            int realSize = 0;
-            for (int i = 0; i < size; i++) {
-                if (bytes[i] != 0) {
-                    continue;
+            if (size < 0) {
+                throw new ArgumentOutOfRangeException(nameof(size));
+            }
+
+            int count = Math.Min(size, source.Length - offset);
+            int stringLength = count;
+            for (int i = 0; i < count; i++) {
+                if (source[offset + i] == 0) {
+                    stringLength = i;
+                    break;
                 }
-
-                realSize = i;
-                break;
             }
 
-            Array.Resize(ref bytes, realSize);
-            return Encoding.UTF8.GetString(bytes);
+            return Encoding.UTF8.GetString(source, offset, stringLength);
         }
 
         public T GetStructure<T>(IntPtr address, int offset = 0) {
             IntPtr buffer = Marshal.AllocCoTaskMem(Marshal.SizeOf(typeof(T)));
-            UnsafeNativeMethods.ReadProcessMemory(this.Configuration.ProcessModel.Process.Handle, address + offset, buffer, new IntPtr(Marshal.SizeOf(typeof(T))), out IntPtr bytesRead);
-            T retValue = (T)Marshal.PtrToStructure(buffer, typeof(T));
-            Marshal.FreeCoTaskMem(buffer);
-            return retValue;
+            try {
+                if (!UnsafeNativeMethods.ReadProcessMemory(this.ProcessHandle, address + offset, buffer, new IntPtr(Marshal.SizeOf(typeof(T))), out IntPtr _)) {
+                    return default(T);
+                }
+
+                return (T) Marshal.PtrToStructure(buffer, typeof(T));
+            }
+            finally {
+                Marshal.FreeCoTaskMem(buffer);
+            }
         }
 
         public ushort GetUInt16(IntPtr address, long offset = 0) {
-            byte[] value = new byte[4];
-            this.Peek(new IntPtr(address.ToInt64() + offset), value);
-            return SharlayanBitConverter.TryToUInt16(value, 0);
+            if (_twoByteBuffer == null) {
+                _twoByteBuffer = new byte[2];
+            }
+
+            return this.Peek(new IntPtr(address.ToInt64() + offset), _twoByteBuffer) ? SharlayanBitConverter.TryToUInt16(_twoByteBuffer, 0) : (ushort) 0;
         }
 
         public uint GetUInt32(IntPtr address, long offset = 0) {
-            byte[] value = new byte[4];
-            this.Peek(new IntPtr(address.ToInt64() + offset), value);
-            return SharlayanBitConverter.TryToUInt32(value, 0);
+            if (_fourByteBuffer == null) {
+                _fourByteBuffer = new byte[4];
+            }
+
+            return this.Peek(new IntPtr(address.ToInt64() + offset), _fourByteBuffer) ? SharlayanBitConverter.TryToUInt32(_fourByteBuffer, 0) : 0;
         }
 
         public ulong GetUInt64(IntPtr address, long offset = 0) {
-            byte[] value = new byte[8];
-            this.Peek(new IntPtr(address.ToInt64() + offset), value);
-            return SharlayanBitConverter.TryToUInt32(value, 0);
+            if (_eightByteBuffer == null) {
+                _eightByteBuffer = new byte[8];
+            }
+
+            return this.Peek(new IntPtr(address.ToInt64() + offset), _eightByteBuffer) ? SharlayanBitConverter.TryToUInt64(_eightByteBuffer, 0) : 0;
         }
 
         public ulong GetUInt64FromBytes(byte[] source, int index = 0) {
@@ -238,10 +298,26 @@ namespace Sharlayan {
             return UnsafeNativeMethods.ReadProcessMemory(this.ProcessHandle, address, buffer, new IntPtr(buffer.Length), out IntPtr bytesRead);
         }
 
+        public bool Peek(IntPtr address, byte[] buffer, int count) {
+            if (buffer == null) {
+                throw new ArgumentNullException(nameof(buffer));
+            }
+
+            if (count < 0 || count > buffer.Length) {
+                throw new ArgumentOutOfRangeException(nameof(count));
+            }
+
+            return UnsafeNativeMethods.ReadProcessMemory(this.ProcessHandle, address, buffer, new IntPtr(count), out IntPtr bytesRead);
+        }
+
         public IntPtr ReadPointer(IntPtr address, long offset = 0) {
-            byte[] win64 = new byte[8];
-            this.Peek(new IntPtr(address.ToInt64() + offset), win64);
-            return new IntPtr(SharlayanBitConverter.TryToInt64(win64, 0));
+            if (_eightByteBuffer == null) {
+                _eightByteBuffer = new byte[8];
+            }
+
+            return this.Peek(new IntPtr(address.ToInt64() + offset), _eightByteBuffer)
+                       ? new IntPtr(SharlayanBitConverter.TryToInt64(_eightByteBuffer, 0))
+                       : IntPtr.Zero;
         }
 
         public IntPtr ResolvePointerPath(IEnumerable<long> path, IntPtr baseAddress, bool IsASMSignature = false) {
