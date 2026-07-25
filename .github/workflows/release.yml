@@ -21,7 +21,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  release:
+  build:
     if: github.ref == 'refs/heads/min-chat'
     runs-on: windows-latest
 
@@ -88,18 +88,52 @@ jobs:
           path: artifacts/packages/*
           if-no-files-found: error
 
-      - name: Publish package to NuGet
-        if: ${{ inputs.publish }}
+  publish:
+    if: ${{ inputs.publish && github.ref == 'refs/heads/min-chat' }}
+    needs: build
+    runs-on: windows-latest
+    environment: production
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@67a3573c9a986a3f9c594539f4ab511d57bb3ce9 # v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Download verified package
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: sharlayan-lite-${{ inputs.package_version }}
+          path: artifacts/packages
+
+      - name: Validate package artifact
         shell: pwsh
-        env:
-          NUGET_TOKEN: ${{ secrets.NUGET_TOKEN }}
         run: |
           $packages = @(Get-ChildItem -LiteralPath artifacts/packages -File -Filter '*.nupkg')
           if ($packages.Count -ne 1) {
             throw "Expected exactly one package to publish, found $($packages.Count)."
           }
 
-          dotnet nuget push $packages[0].FullName --api-key $env:NUGET_TOKEN --source https://api.nuget.org/v3/index.json
+      - name: Log in to NuGet
+        id: nuget-login
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1
+        with:
+          user: ${{ secrets.NUGET_USER }}
+
+      - name: Publish package to NuGet
+        shell: pwsh
+        env:
+          NUGET_API_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: |
+          $packages = @(Get-ChildItem -LiteralPath artifacts/packages -File -Filter '*.nupkg')
+          if ($packages.Count -ne 1) {
+            throw "Expected exactly one package to publish, found $($packages.Count)."
+          }
+
+          dotnet nuget push $packages[0].FullName --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json
           if ($LASTEXITCODE -ne 0) {
             throw "NuGet push failed with exit code $LASTEXITCODE."
           }
