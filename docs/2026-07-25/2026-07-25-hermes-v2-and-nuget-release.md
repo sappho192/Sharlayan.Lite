@@ -115,14 +115,14 @@ Candidate와 verifier commit `3e27261`을 사용한 실제 게임 결과:
 
 - CHATLOG signature match 정확히 1개
 - module scan failed read 0개
-- Thancred current Talk의 name/text가 실제 화면과 일치
-- 다음 대사에서 Urianger current Talk로 전환되고 화면과 일치
+- 첫 current Talk의 speaker/text가 실제 화면과 일치
+- 다음 Talk로 진행했을 때 current 결과가 즉시 전환되고 화면과 일치
 - Talk 종료 후 이전 값이 `Source=Last`, `IsVisible=False`로 보존
 - 60초 CHATLOG polling 신규 entry 2개, cursor 진행, wrap 0회
 - `LIVE SMOKE PASS`
 
-실제 Talk 문자열은 사용자가 개인정보가 아니라고 명시적으로 허용한 진단에서만 출력했다.
-일반 공유 로그의 기본값은 source, visibility 및 길이만 출력하는 것이다.
+실제 Talk 문자열은 일시적인 로컬 에이전트 진단에서만 화면과 대조했고 public 문서에는
+보존하지 않는다. 일반 공유 로그에는 source, visibility, 길이 및 화면 일치 여부만 기록한다.
 
 ### Release gate 보강
 

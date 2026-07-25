@@ -1,5 +1,9 @@
 # Hermes v2 런타임 전환 계획
 
+> **상태 안내 (2026-07-25):** 구현 및 package release 상태를 아래 체크리스트에 반영했다.
+> 실제 release waiver와 최종 배포 증거는
+> `../2026-07-25/2026-07-25-hermes-v2-and-nuget-release.md`를 참조한다.
+
 ## 1. 문서 역할
 
 이 문서는 Sharlayan.Lite가 ffxiv-hermes v2 manifest를 안전하게 소비하고 CHATLOG와 표준 NPC Talk를 고수준 API로 제공하기 위한 저장소별 구현 계획이다.
@@ -7,13 +11,14 @@
 Hermes v2 스키마, 생성, 검증, 배포 및 rollback의 기준 문서는 다음 파일이다.
 
 ```text
-D:\REPO\ffxiv-hermes\V2_IMPLEMENTATION_PLAN.md
+sappho192/ffxiv-hermes:
+  docs/V2_IMPLEMENTATION_PLAN.md
 ```
 
 공개 저장소 기준 문서:
 
 ```text
-https://github.com/sappho192/ffxiv-hermes/blob/main/V2_IMPLEMENTATION_PLAN.md
+https://github.com/sappho192/ffxiv-hermes/blob/main/docs/V2_IMPLEMENTATION_PLAN.md
 ```
 
 이 문서는 Hermes 스키마를 별도로 재정의하지 않는다. 구현 중 계약이 달라지면 Hermes 기준 문서를 먼저 변경하고 fixture와 schema를 갱신한 뒤 Sharlayan을 변경한다.
@@ -575,11 +580,11 @@ FallbackReason
 
 ### Phase 1: 계약과 embedded baseline
 
-- [ ] Hermes v2 schema와 fixture를 test input으로 추가
-- [ ] DTO와 strict validator 구현
-- [ ] 현재 generated CHATLOG와 동등한 embedded manifest 추가
-- [ ] manifest mapper와 generated C# 동등성 테스트 추가
-- [ ] exact byte revision 검증 구현
+- [x] Hermes v2 schema와 fixture를 test input으로 추가
+- [x] DTO와 strict validator 구현
+- [x] 현재 generated CHATLOG와 동등한 embedded manifest 추가
+- [x] manifest mapper와 generated C# 동등성 테스트 추가
+- [x] exact byte revision 검증 구현
 
 완료 조건:
 
@@ -589,12 +594,12 @@ FallbackReason
 
 ### Phase 2: Provider와 cache
 
-- [ ] 새 resource configuration 추가
-- [ ] EmbeddedOnly provider 구현
-- [ ] RemotePreferred HTTP provider 구현
-- [ ] immutable cache와 ETag 처리 구현
-- [ ] remote, cache, embedded fallback 테스트 추가
-- [ ] resource diagnostics 모델 추가
+- [x] 새 resource configuration 추가
+- [x] EmbeddedOnly provider 구현
+- [x] RemotePreferred HTTP provider 구현
+- [x] immutable cache와 ETag 처리 구현
+- [x] remote, cache, embedded fallback 테스트 추가
+- [x] resource diagnostics 모델 추가
 
 완료 조건:
 
@@ -604,12 +609,12 @@ FallbackReason
 
 ### Phase 3: MemoryHandler 초기화 전환
 
-- [ ] `InitializationTask`에 manifest 획득 포함
-- [ ] signature와 structure atomic commit 구현
-- [ ] runtime scan fallback 구현
-- [ ] event 한 번 발생 보장
-- [ ] generated C# runtime 경로 제거 또는 fallback 전용 축소
-- [ ] public API compatibility 검사
+- [x] `InitializationTask`에 manifest 획득 포함
+- [x] signature와 structure atomic commit 구현
+- [x] runtime scan fallback 구현
+- [x] event 한 번 발생 보장
+- [x] generated C# runtime 경로 제거 또는 fallback 전용 축소
+- [x] public API compatibility 검사
 
 완료 조건:
 
@@ -635,12 +640,12 @@ FallbackReason
 
 ### Phase 5: Live 검증과 package release
 
-- [ ] LiveSmoke manifest option 추가
+- [x] LiveSmoke manifest option 추가
 - [ ] 글로벌 및 한국 client 검증
-- [ ] remote, cache 및 embedded 각각 검증
-- [ ] pack과 package validation 실행
-- [ ] README와 CHANGELOG 갱신
-- [ ] IronworksTranslator가 사용할 package version 배포
+- [x] remote, cache 및 embedded 각각 검증
+- [x] pack과 package validation 실행
+- [x] README와 CHANGELOG 갱신
+- [x] IronworksTranslator가 사용할 package version 배포
 
 완료 조건:
 

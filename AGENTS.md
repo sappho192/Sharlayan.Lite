@@ -83,8 +83,11 @@ carry this waiver into another release.
 - Package 9.1.2 was published by Actions run
   `https://github.com/sappho192/Sharlayan.Lite/actions/runs/30161079520`.
 - The package currently lacks an embedded README; address this before a future package if practical.
-- Do not copy Environment input identifiers, reviewer identities, local user paths, process IDs, or
-  raw game dialogue into public documentation. Inspect current configuration without exposing values:
+- Do not copy Environment input identifiers, reviewer identities, local user paths, process IDs,
+  player names, user-generated chat, NPC names, or raw NPC dialogue into public documentation.
+  Exact Talk strings may be viewed transiently in a local agent diagnostic session, but retain only
+  match status, source, visibility, and lengths in committed artifacts. Inspect current configuration
+  without exposing values:
 
 ```powershell
 rg -n 'environment:|id-token:|secrets\.' .github/workflows/release.yml

@@ -51,8 +51,13 @@ dotnet pack Sharlayan/Sharlayan.csproj --configuration Release --no-build --outp
 
 - `package_version`: 생성할 NuGet version. prerelease 예시는 `8.1.0-beta.1`이다.
 - `publish`: 기본값은 `false`다. `false`이면 검증된 artifact만 만들고 NuGet에는 게시하지 않는다.
-- `publish: true`: 모든 검증을 통과한 단일 package를 `NUGET_TOKEN`으로 게시한다.
+- `publish: true`: build job이 모든 검증과 artifact upload를 통과한 뒤 protected
+  `production` environment 승인을 기다린다. Publish job은 GitHub OIDC와 `NuGet/login`으로
+  실행 시점의 단기 API key를 받아 검증된 package를 게시하며 저장된 장기 API key를 사용하지
+  않는다.
 
 NuGet push에는 `--skip-duplicate`를 사용하지 않는다. version 충돌이나 잘못된 재배포는 workflow 실패로 명확히 드러나야 한다.
 
-현재 게임 live smoke와 실제 consumer 검증이 끝나기 전에는 stable version을 게시하지 않는다.
+현재 game live smoke와 실제 consumer 검증 결과를 기록하기 전에는 stable version을 게시하지
+않는다. `9.1.2`의 실제 배포와 일회성 release waiver는
+`../2026-07-25/2026-07-25-hermes-v2-and-nuget-release.md`를 참조한다.

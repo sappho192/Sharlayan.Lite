@@ -1,5 +1,10 @@
 # Hermes v2 / Sharlayan.Lite 9.1.2 handoff
 
+> **상태 안내 (2026-07-25):** 이 handoff의 구현·Hermes 승격·embedded 동기화는 완료됐고,
+> Sharlayan.Lite `9.1.2`도 명시적 release waiver 후 공개됐다. 아래 smoke 수치와 당시
+> 미충족 gate는 역사적 증거로 유지한다. 최종 NuGet 배포 결과는
+> `../2026-07-25/2026-07-25-hermes-v2-and-nuget-release.md`를 참조한다.
+
 작성일: 2026-07-23
 
 최종 갱신: 2026-07-25
@@ -15,7 +20,8 @@ IronworksTranslator 코드는 이 범위에 포함하지 않는다. 해당 저�
 
 ## 시작 상태
 
-- 저장소: `D:\REPO\sharlayan`
+- 저장소: `sappho192/Sharlayan.Lite`
+- local checkout: `<path-to-Sharlayan.Lite>`
 - branch: `min-chat`
 - 구현 기준 base: `ced3652 Add live chat smoke validation`
 - currentTalk 구현 및 실제 게임 검증 commit:
@@ -27,14 +33,15 @@ IronworksTranslator 코드는 이 범위에 포함하지 않는다. 해당 저�
 첫 확인 명령:
 
 ```powershell
-cd D:\REPO\sharlayan
+$sharlayanRoot = '<path-to-Sharlayan.Lite>'
+Set-Location $sharlayanRoot
 git status --short
 git diff --check
 ```
 
 ## Hermes upstream 상태
 
-Hermes 저장소는 `D:\REPO\ffxiv-hermes`이며 currentTalk production manifest가 배포되었다.
+Hermes 저장소는 `sappho192/ffxiv-hermes`이며 currentTalk production manifest가 배포되었다.
 
 - Production state commit: `cd57f81`
 - Public verification retry fix: `2601b37`
@@ -46,7 +53,8 @@ Hermes 저장소는 `D:\REPO\ffxiv-hermes`이며 currentTalk production manifest
   `sha256:cbf5e08e2bcfe214f5ee42f634dd6cf23939afcb056904bfd838bf0fd9a186af`
 - Minimum Sharlayan version: `9.1.2`
 - Candidate file:
-  `D:\REPO\ffxiv-hermes\v2\candidates\8ff04195c4e77ef0b85d15c6fd1c67785378f0fb.json`
+  `v2/candidates/8ff04195c4e77ef0b85d15c6fd1c67785378f0fb.json` in
+  `sappho192/ffxiv-hermes`
 
 Production `v2/latest.json`과 immutable manifest는 public endpoint에서 200으로 확인했으며,
 두 로컬 파일은 public object와 byte-for-byte 동일하다. Manifest는 `live-verified`이고 실제
@@ -152,10 +160,10 @@ dotnet pack Sharlayan\Sharlayan.csproj -c Release --no-build `
 - module scan failed read: 0개
 - resolved locations: 4개
 - initialization: 118~131 ms
-- Thancred currentTalk가 실제 화면과 name/text 모두 일치
-- 다음 대사로 진행한 뒤 Urianger currentTalk로 즉시 전환되어 실제 화면과 일치
-- Talk 종료 시 동일 Thancred 값이 `Source=Last`, `IsVisible=False`로 보존됨
-- Urianger Talk를 연 상태로 60초 full smoke 시작과 종료 시 currentTalk 일치
+- 첫 currentTalk가 실제 화면의 speaker/text와 일치
+- 다음 Talk로 진행한 뒤 currentTalk가 즉시 전환되어 실제 화면과 일치
+- Talk 종료 시 직전 값이 `Source=Last`, `IsVisible=False`로 보존됨
+- current Talk를 연 상태로 60초 full smoke 시작과 종료 시 결과 일치
 - 60초 CHATLOG polling: 신규 entry 2개, code `000A`, wrap 0회
 - cursor: `27:2734`에서 `29:2850`으로 진행
 - 최종 결과: `LIVE SMOKE PASS`
@@ -184,19 +192,15 @@ FFXIV가 실행 중인 Windows 환경에서 candidate와 verifier `4d38d25`를 �
 raw header를 확인하는 임시 계측을 수행했다.
 
 ```text
-name: BufSize=64,  BufUsed=9,   StringLength(+0x18)=0
-text: BufSize=256, BufUsed=140, StringLength(+0x18)=0
+speaker field: BufSize=64,  BufUsed=9,   StringLength(+0x18)=0
+dialogue field: BufSize=256, BufUsed=140, StringLength(+0x18)=0
 ```
 
-`BufUsed - 1` 바이트를 strict UTF-8로 읽으면 실제 값은 다음과 같이 정상이다.
+`BufUsed - 1` 바이트를 strict UTF-8로 읽은 speaker/text는 직전에 확정된 화면 내용과
+일치했다. 정확한 문자열은 일시적인 로컬 에이전트 진단에서만 확인하고 public 문서에는
+보존하지 않는다.
 
-```text
-name: Estinien
-text: Having been to Thavnair before, I can travel by aetheryte, but what of the rest
-      of you? Another sea voyage would waste time we do not have.
-```
-
-진단 당시 화면에는 다음 단계인 Thancred의 Talk가 표시 중이었다. 따라서 `LastTalkName`과
+진단 당시 화면에는 다음 단계의 Talk가 표시 중이었다. 따라서 `LastTalkName`과
 `LastTalkText`는 현재 표시 중인 창과 동기화된 값이 아니라 직전에 확정된 Talk를 보존한다.
 이 동작은 smoke에서 값의 가독성을 입증하는 데는 충분하지만, consumer가 현재 활성 대사를
 판별하는 용도로 사용하면 안 된다.
@@ -206,13 +210,8 @@ text: Having been to Thavnair before, I can travel by aetheryte, but what of the
 같은 게임 세션에서 `RaptureAtkUnitManager.AllLoadedUnitsList`를 외부 메모리로 순회하고 이름이
 `Talk`인 활성 addon을 찾아 현재 값을 직접 확인했다.
 
-```text
-Talk AtkValue[0], type=0x28 ManagedString:
-  Krile was of the same mind, and has already secured the aid of the good folk
-  of the Confluence. We'll take ourselves there.
-Talk AtkValue[1], type=0x28 ManagedString:
-  Thancred
-```
+`AtkValues[0]`은 `ManagedString(0x28)` 본문으로, `AtkValues[1]`은 같은 type의 화자로
+확인됐으며 두 값 모두 현재 화면과 일치했다. 정확한 문자열은 public 문서에 보존하지 않는다.
 
 이는 화면에 표시 중인 이름과 본문에 정확히 일치했다. `AddonTalk`의 text node `+0x238`에서도
 이름, `+0x240`에서도 본문을 읽을 수 있었지만, 본문 node에는 줄바꿈용 SeString control payload가
@@ -309,13 +308,17 @@ Production promote 전 이 commit을 remote에 push해야 한다.
 
 ### 2. Attach-only Talk smoke — 완료
 
-FFXIV에 로그인하고 표준 NPC Talk 창을 연 상태에서 실행한다. 게임 로그인에는 2FA와 GPU
+Interactive game session에서 표준 NPC Talk 창을 연 상태로 실행한다. GPU-capable Windows
 환경이 필요하므로 이 검증은 수동으로 유지한다.
 
 ```powershell
+$hermesRoot = '<path-to-ffxiv-hermes>'
+$candidateManifest = Join-Path $hermesRoot `
+  'v2\candidates\8ff04195c4e77ef0b85d15c6fd1c67785378f0fb.json'
+
 dotnet run --project tools\Sharlayan.LiveSmoke\Sharlayan.LiveSmoke.csproj `
   --configuration Release -- `
-  --manifest D:\REPO\ffxiv-hermes\v2\candidates\8ff04195c4e77ef0b85d15c6fd1c67785378f0fb.json `
+  --manifest $candidateManifest `
   --attach-only `
   --require-current-talk `
   --print-talk
@@ -337,9 +340,13 @@ NPC Talk가 열린 상태를 유지하고 60초 동안 새 chat entry가 생기�
 메시지를 발생시킨다.
 
 ```powershell
+$hermesRoot = '<path-to-ffxiv-hermes>'
+$candidateManifest = Join-Path $hermesRoot `
+  'v2\candidates\8ff04195c4e77ef0b85d15c6fd1c67785378f0fb.json'
+
 dotnet run --project tools\Sharlayan.LiveSmoke\Sharlayan.LiveSmoke.csproj `
   --configuration Release -- `
-  --manifest D:\REPO\ffxiv-hermes\v2\candidates\8ff04195c4e77ef0b85d15c6fd1c67785378f0fb.json `
+  --manifest $candidateManifest `
   --poll-seconds 60 `
   --require-current-talk
 ```
@@ -385,9 +392,16 @@ executable_sha256: <위에서 계산한 lowercase SHA-256>
 verifier_commit: <Sharlayan smoke commit SHA>
 ```
 
-`main` environment에서 `sappho192`가 배포를 승인한다. `prevent_self_review=false` 및
-deployment branch `main`이 설정되어 있다. Publish workflow는 immutable object를 먼저 올리고
-read-back checksum을 확인한 다음 latest pointer를 마지막에 교체한다.
+Protected `main` environment 승인이 필요하다. Public 문서에는 reviewer identity와
+self-review 세부값을 고정하지 않고 다음 읽기 전용 명령으로 현재 설정을 확인한다.
+
+```powershell
+gh api repos/sappho192/ffxiv-hermes/environments/main
+gh api repos/sappho192/ffxiv-hermes/environments/main/deployment-branch-policies
+```
+
+Publish workflow는 immutable object를 먼저 올리고 read-back checksum을 확인한 다음 latest
+pointer를 마지막에 교체한다.
 
 ### 6. Embedded production manifest 동기화 — 완료
 
@@ -403,15 +417,15 @@ Promote 성공 후 Hermes가 기록한 live-verified immutable manifest byte를
 - 66개 이상의 전체 test 통과
 - multi-target build 및 package verification 통과
 
-Production package 검증까지 통과했다. Sharlayan.Lite 9.1.2 package의 실제 공개 배포는
-`2026-07-22-05-live-smoke.md`에 남은 release gate를 별도로 확인한 뒤 진행한다.
+Production package 검증까지 통과했다. 이 시점에는
+`2026-07-22-05-live-smoke.md`의 미충족 release gate 때문에 공개를 보류했다. 이후 사용자가
+미충족 항목을 PASS로 바꾸지 않는 명시적 release waiver를 승인했고 `9.1.2`를 공개했다.
 
-## 아직 하지 말아야 할 작업
+## 계속 유효한 release 원칙
 
-- Live smoke 없이 Hermes `publish-v2` promote 실행
-- `2026-07-22-05-live-smoke.md`의 9.1.2 release gate를 모두 통과하기 전 package 공개 배포
+- 다음 release에 `9.1.2`의 일회성 waiver를 자동 적용
+- Live smoke 증거 없이 Hermes `publish-v2` promote 실행
 - Candidate manifest를 remote/cache production으로 취급
-- 검증 전 Sharlayan 9.1.2 package 공개 배포
 - embedded manifest와 remote manifest의 CHATLOG/Talk 일부를 혼합
 - `LastTalk` 값을 현재 창 활성 상태로 추측
 - IronworksTranslator source 직접 변경
@@ -420,5 +434,5 @@ Production package 검증까지 통과했다. Sharlayan.Lite 9.1.2 package의 �
 
 - `docs/2026-07-22/2026-07-22-05-live-smoke.md`
 - `docs/2026-07-22/2026-07-22-06-hermes-v2-runtime-plan.md`
-- `D:\REPO\ffxiv-hermes\docs\V2_IMPLEMENTATION_PLAN.md`
-- `D:\REPO\ffxiv-hermes\docs\V2_GITHUB_AND_CACHE_SETUP.md`
+- `sappho192/ffxiv-hermes`의 `docs/V2_IMPLEMENTATION_PLAN.md`
+- `sappho192/ffxiv-hermes`의 `docs/V2_GITHUB_AND_CACHE_SETUP.md`
