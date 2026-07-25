@@ -32,7 +32,12 @@ internal static class Program {
             SharlayanConfiguration configuration = new SharlayanConfiguration {
                 CharacterName = ConfiguredCharacterName,
                 ProcessModel = new ProcessModel { Process = process },
+                ResourceMode = options.RemotePreferred ? ResourceMode.RemotePreferred : ResourceMode.EmbeddedOnly,
+                ResourceCacheDirectory = options.ResourceCacheDirectory,
             };
+            if (options.HermesV2LatestUri != null) {
+                configuration.HermesV2LatestUri = options.HermesV2LatestUri;
+            }
             Signature signature;
             if (!string.IsNullOrEmpty(options.ManifestPath)) {
                 byte[] manifestBytes = File.ReadAllBytes(options.ManifestPath);
@@ -121,6 +126,17 @@ internal static class Program {
                         options.PrintTalk);
                 }
 
+                if (options.ConcurrentReaders > 1) {
+                    await RunConcurrentProbe(
+                        handler,
+                        process,
+                        exceptions,
+                        firstPoll.PreviousArrayIndex,
+                        firstPoll.PreviousOffset,
+                        options.ConcurrentReaders,
+                        options.ConcurrentCalls);
+                }
+
                 if (options.AttachOnly) {
                     Console.WriteLine("LIVE ATTACH PASS");
                     return 0;
@@ -134,6 +150,7 @@ internal static class Program {
                 Stopwatch polling = Stopwatch.StartNew();
                 TimeSpan pollingDuration = TimeSpan.FromSeconds(options.PollSeconds);
                 TimeSpan pollingInterval = TimeSpan.FromMilliseconds(options.PollIntervalMilliseconds);
+                TimeSpan nextProgress = TimeSpan.FromSeconds(options.ProgressSeconds);
                 while (polling.Elapsed < pollingDuration) {
                     TimeSpan remaining = pollingDuration - polling.Elapsed;
                     await Task.Delay(remaining < pollingInterval ? remaining : pollingInterval);
@@ -168,6 +185,12 @@ internal static class Program {
                         entryCount++;
                         codes.Add(item.Code ?? string.Empty);
                     }
+
+                    if (polling.Elapsed >= nextProgress && polling.Elapsed < pollingDuration) {
+                        Console.WriteLine(
+                            $"Progress: {polling.Elapsed.TotalSeconds:F1} s, entries={entryCount}, wraps={wrapCount}, codes={string.Join(',', codes.OrderBy(code => code))}, cursor={arrayIndex}:{offset}");
+                        nextProgress += TimeSpan.FromSeconds(options.ProgressSeconds);
+                    }
                 }
 
                 ThrowIfObserved(exceptions);
@@ -176,8 +199,19 @@ internal static class Program {
                 }
 
                 Console.WriteLine($"Polling: {polling.Elapsed.TotalSeconds:F1} s, entries={entryCount}, wraps={wrapCount}, codes={string.Join(',', codes.OrderBy(code => code))}, cursor={arrayIndex}:{offset}");
-                if (entryCount == 0) {
-                    throw new InvalidOperationException("No new chat entry was observed during the polling window.");
+                if (entryCount < options.MinimumEntries) {
+                    throw new InvalidOperationException(
+                        $"Expected at least {options.MinimumEntries} new chat entries, observed {entryCount}.");
+                }
+
+                if (wrapCount < options.MinimumWraps) {
+                    throw new InvalidOperationException(
+                        $"Expected at least {options.MinimumWraps} chat ring wraps, observed {wrapCount}.");
+                }
+
+                string[] missingCodes = options.RequiredCodes.Except(codes, StringComparer.Ordinal).OrderBy(code => code).ToArray();
+                if (missingCodes.Length > 0) {
+                    throw new InvalidOperationException("Required chat codes were not observed: " + string.Join(',', missingCodes));
                 }
 
                 Console.WriteLine("LIVE SMOKE PASS");
@@ -295,6 +329,46 @@ internal static class Program {
         }
     }
 
+    private static async Task RunConcurrentProbe(
+        MemoryHandler handler,
+        Process process,
+        ConcurrentQueue<Exception> exceptions,
+        int arrayIndex,
+        int offset,
+        int readerCount,
+        int callsPerReader) {
+        using ManualResetEventSlim start = new ManualResetEventSlim();
+        Task[] readers = Enumerable.Range(0, readerCount)
+            .Select(
+                _ => Task.Run(
+                    () => {
+                        start.Wait();
+                        for (int call = 0; call < callsPerReader; call++) {
+                            ChatLogResult result = handler.Reader.GetChatLog(arrayIndex, offset);
+                            if (!result.ChatLogItems.IsEmpty
+                                && result.PreviousArrayIndex == arrayIndex
+                                && result.PreviousOffset == offset) {
+                                throw new InvalidOperationException("A concurrent chat read returned entries without advancing its cursor.");
+                            }
+
+                            while (result.ChatLogItems.TryDequeue(out var item)) {
+                                if (!string.Equals(item.PlayerCharacterName, ConfiguredCharacterName, StringComparison.Ordinal)) {
+                                    throw new InvalidOperationException("Configured character name was not propagated during concurrent reads.");
+                                }
+                            }
+                        }
+                    }))
+            .ToArray();
+        start.Set();
+        await Task.WhenAll(readers);
+        ThrowIfObserved(exceptions);
+        if (process.HasExited) {
+            throw new InvalidOperationException("FFXIV exited during concurrent chat reads.");
+        }
+
+        Console.WriteLine($"Concurrent readers: {readerCount} threads x {callsPerReader} calls, PASS");
+    }
+
     private static void ValidateTalk(string label, bool canRead, TalkResult talk, bool printTalk) {
         if (!canRead) {
             throw new InvalidOperationException($"{label} locations were not resolved.");
@@ -317,15 +391,33 @@ internal static class Program {
 
         public bool AttachOnly { get; private set; }
 
+        public Uri? HermesV2LatestUri { get; private set; }
+
+        public int ConcurrentCalls { get; private set; } = 20;
+
+        public int ConcurrentReaders { get; private set; } = 1;
+
+        public int MinimumEntries { get; private set; } = 1;
+
+        public int MinimumWraps { get; private set; }
+
         public int PollIntervalMilliseconds { get; private set; } = 250;
 
         public int PollSeconds { get; private set; } = 30;
+
+        public int ProgressSeconds { get; private set; } = 60;
 
         public int? ProcessId { get; private set; }
 
         public string? ManifestPath { get; private set; }
 
         public bool PrintTalk { get; private set; }
+
+        public bool RemotePreferred { get; private set; }
+
+        public string? ResourceCacheDirectory { get; private set; }
+
+        public HashSet<string> RequiredCodes { get; } = new HashSet<string>(StringComparer.Ordinal);
 
         public bool RequireCurrentTalk { get; private set; }
 
@@ -343,17 +435,44 @@ internal static class Program {
                     case "--initialization-timeout":
                         options.InitializationTimeoutSeconds = ReadPositiveInt(args, ref index);
                         break;
+                    case "--concurrent-calls":
+                        options.ConcurrentCalls = ReadPositiveInt(args, ref index);
+                        break;
+                    case "--concurrent-readers":
+                        options.ConcurrentReaders = ReadPositiveInt(args, ref index);
+                        break;
+                    case "--minimum-entries":
+                        options.MinimumEntries = ReadNonNegativeInt(args, ref index);
+                        break;
+                    case "--minimum-wraps":
+                        options.MinimumWraps = ReadNonNegativeInt(args, ref index);
+                        break;
                     case "--poll-interval":
                         options.PollIntervalMilliseconds = ReadPositiveInt(args, ref index);
                         break;
                     case "--poll-seconds":
                         options.PollSeconds = ReadPositiveInt(args, ref index);
                         break;
+                    case "--progress-seconds":
+                        options.ProgressSeconds = ReadPositiveInt(args, ref index);
+                        break;
                     case "--process-id":
                         options.ProcessId = ReadPositiveInt(args, ref index);
                         break;
                     case "--manifest":
-                        options.ManifestPath = ReadString(args, ref index);
+                        options.ManifestPath = Path.GetFullPath(ReadString(args, ref index));
+                        break;
+                    case "--latest-uri":
+                        options.HermesV2LatestUri = ReadHttpsUri(args, ref index);
+                        break;
+                    case "--remote-preferred":
+                        options.RemotePreferred = true;
+                        break;
+                    case "--resource-cache":
+                        options.ResourceCacheDirectory = Path.GetFullPath(ReadString(args, ref index));
+                        break;
+                    case "--required-code":
+                        options.RequiredCodes.Add(ReadChatCode(args, ref index));
                         break;
                     case "--require-talk":
                         options.RequireTalk = true;
@@ -370,6 +489,18 @@ internal static class Program {
                     default:
                         throw new ArgumentException($"Unknown argument '{args[index]}'.");
                 }
+            }
+
+            if (options.ManifestPath != null && options.RemotePreferred) {
+                throw new ArgumentException("--manifest and --remote-preferred cannot be used together.");
+            }
+
+            if (options.ConcurrentReaders > 64) {
+                throw new ArgumentOutOfRangeException(nameof(args), "--concurrent-readers cannot exceed 64.");
+            }
+
+            if (options.ConcurrentCalls > 10000) {
+                throw new ArgumentOutOfRangeException(nameof(args), "--concurrent-calls cannot exceed 10000.");
             }
 
             return options;
@@ -397,7 +528,28 @@ internal static class Program {
                 throw new ArgumentException("Expected a non-empty argument value.");
             }
 
-            return Path.GetFullPath(args[index]);
+            return args[index];
+        }
+
+        private static string ReadChatCode(string[] args, ref int index) {
+            string value = ReadString(args, ref index).ToUpperInvariant();
+            if (value.Length != 4 || value.Any(character => !Uri.IsHexDigit(character))) {
+                throw new ArgumentException("Expected a four-character hexadecimal chat code.");
+            }
+
+            return value;
+        }
+
+        private static Uri ReadHttpsUri(string[] args, ref int index) {
+            string value = ReadString(args, ref index);
+            if (!Uri.TryCreate(value, UriKind.Absolute, out Uri? uri)
+                || uri.Scheme != Uri.UriSchemeHttps
+                || !string.IsNullOrEmpty(uri.Query)
+                || !string.IsNullOrEmpty(uri.Fragment)) {
+                throw new ArgumentException("Expected an absolute HTTPS URI without query or fragment.");
+            }
+
+            return uri;
         }
     }
 }
