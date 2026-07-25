@@ -20,14 +20,17 @@ namespace Sharlayan.Tests.Resources {
 
             Assert.Equal(2, manifest.SchemaVersion);
             Assert.Equal("8ff04195c4e77ef0b85d15c6fd1c67785378f0fb", manifest.Source.FcsCommit);
-            Assert.Equal("sha256:cbf5e08e2bcfe214f5ee42f634dd6cf23939afcb056904bfd838bf0fd9a186af", HermesV2ManifestParser.CalculateRevision(bytes));
+            Assert.Equal("sha256:419248bf2ef93aa64e72723ea9e97d5503163178dab63e90a8155b359ebcf96d", HermesV2ManifestParser.CalculateRevision(bytes));
         }
 
         [Fact]
-        public void RemoteParserRejectsCandidateValidation() {
+        public void RemoteParserAcceptsLiveVerifiedValidation() {
             byte[] bytes = ReadEmbeddedFixture();
 
-            Assert.Throws<InvalidDataException>(() => HermesV2ManifestParser.ParseManifest(bytes, null, "9.1.2", allowCandidate: false));
+            HermesV2Manifest manifest = HermesV2ManifestParser.ParseManifest(bytes, null, "9.1.2", allowCandidate: false);
+
+            Assert.Equal("live-verified", manifest.Validation.Status);
+            Assert.Equal("3e27261f82851e1e88c413a25461e6ca0ad551e8", manifest.Validation.VerifierCommit);
         }
 
         [Fact]
@@ -69,7 +72,7 @@ namespace Sharlayan.Tests.Resources {
         [Fact]
         public void ParserRejectsCandidateWithLiveVerificationFields() {
             JObject json = JObject.Parse(Encoding.UTF8.GetString(ReadEmbeddedFixture()));
-            json["validation"]["gameVersion"] = "7.51";
+            json["validation"]["status"] = "candidate";
 
             Assert.Throws<InvalidDataException>(() => HermesV2ManifestParser.ParseManifest(
                 Encoding.UTF8.GetBytes(json.ToString(Newtonsoft.Json.Formatting.None)),

@@ -8,7 +8,7 @@
     "fcsRepository": "https://github.com/aers/FFXIVClientStructs.git",
     "fcsCommit": "8ff04195c4e77ef0b85d15c6fd1c67785378f0fb",
     "generatorRepository": "https://github.com/sappho192/ffxiv-hermes.git",
-    "generatorCommit": "f44e33479dbf50699b44b1b8932b2b1b21c31f54"
+    "generatorCommit": "746414d55919677c79f6c3709f839ace556551aa"
   },
   "platform": {
     "process": "ffxiv_dx11.exe",
@@ -78,6 +78,9 @@
     }
   },
   "validation": {
-    "status": "candidate"
+    "status": "live-verified",
+    "gameVersion": "2026.06.18.0000.0000",
+    "executableSha256": "4236e770e673150e85f8d10beab2fc4834c82f86aab8a555a9175439fc906a6d",
+    "verifierCommit": "3e27261f82851e1e88c413a25461e6ca0ad551e8"
   }
 }

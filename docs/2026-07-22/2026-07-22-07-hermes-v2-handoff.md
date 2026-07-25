@@ -34,23 +34,28 @@ git diff --check
 
 ## Hermes upstream 상태
 
-Hermes 저장소는 `D:\REPO\ffxiv-hermes`이며 새 currentTalk candidate가 `main`에 병합되었다.
+Hermes 저장소는 `D:\REPO\ffxiv-hermes`이며 currentTalk production manifest가 배포되었다.
 
-- Hermes main commit: `746414d55919677c79f6c3709f839ace556551aa`
+- Production state commit: `cd57f81`
+- Public verification retry fix: `2601b37`
 - FCS commit: `8ff04195c4e77ef0b85d15c6fd1c67785378f0fb`
-- Generator commit: `f44e33479dbf50699b44b1b8932b2b1b21c31f54`
+- Production generator commit: `746414d55919677c79f6c3709f839ace556551aa`
+- Production revision:
+  `sha256:419248bf2ef93aa64e72723ea9e97d5503163178dab63e90a8155b359ebcf96d`
 - Candidate revision:
   `sha256:cbf5e08e2bcfe214f5ee42f634dd6cf23939afcb056904bfd838bf0fd9a186af`
 - Minimum Sharlayan version: `9.1.2`
 - Candidate file:
   `D:\REPO\ffxiv-hermes\v2\candidates\8ff04195c4e77ef0b85d15c6fd1c67785378f0fb.json`
 
-Candidate는 기존 CHATLOG/LastTalk 계약에 `currentStandardTalk` addon traversal 계약을
-추가했고, LastTalk UTF-8 길이 원천을 `bufferUsedMinusNull`로 명시한다.
+Production `v2/latest.json`과 immutable manifest는 public endpoint에서 200으로 확인했으며,
+두 로컬 파일은 public object와 byte-for-byte 동일하다. Manifest는 `live-verified`이고 실제
+게임 버전, 실행 파일 SHA-256 및 Sharlayan verifier commit을 포함한다.
 
-아직 Hermes production `v2/latest.json`은 배포하지 않았다. Candidate의
-`validation.status`는 `candidate`이므로 Sharlayan의 일반 remote/cache 경로에서는 거부되며,
-live-smoke 전용 `--manifest` override에서만 사용할 수 있다.
+최초 publish run `30159936235`는 R2 upload와 latest 교체 후 public endpoint 첫 요청에서 일시적
+403을 받아 실패했다. 약 25초 뒤 public endpoint가 정상화되었고 revision 검증도 통과했다.
+누락된 production Git state는 `cd57f81`로 기록했으며, retry loop가 첫 HTTP 오류에서 종료되지
+않도록 `2601b37`에서 수정했다.
 
 ## Working tree에 구현된 내용
 
@@ -100,9 +105,9 @@ live-smoke 전용 `--manifest` override에서만 사용할 수 있다.
   informational version을 사용
 - manifest/provider 테스트 입력은 `9.1.2`로 정렬
 
-현재 embedded manifest는 새 candidate의 canonical LF byte와 정확히 일치한다. 이는 pre-release
-검증용이며, 최초 live-verified Hermes manifest가 배포된 뒤 정확한 production byte로 다시
-교체해야 한다.
+현재 embedded manifest는 Hermes live-verified production manifest의 canonical LF byte와
+정확히 일치한다. Embedded revision은
+`sha256:419248bf2ef93aa64e72723ea9e97d5503163178dab63e90a8155b359ebcf96d`이다.
 
 ## 확인된 로컬 검증
 
@@ -114,7 +119,7 @@ Release multi-target build: PASS
 Warnings: 0
 Sharlayan.Tests: 66 PASS on net8.0 and net10.0, 0 FAIL
 Sharlayan.Lite 9.1.2 pack: PASS
-Package verification: PASS, 598,040 bytes combined
+Package verification: PASS, 598,870 bytes combined
 ```
 
 재현 명령:
@@ -123,9 +128,9 @@ Package verification: PASS, 598,040 bytes combined
 dotnet build Sharlayan.sln -c Release --no-restore
 dotnet test Sharlayan.Tests\Sharlayan.Tests.csproj -c Release --no-build
 dotnet pack Sharlayan\Sharlayan.csproj -c Release --no-build `
-  -o artifacts\packages-v2-912-current-talk
+  -o artifacts\packages-v2-912-production
 .\tools\Verify-Package.ps1 `
-  -PackageDirectory .\artifacts\packages-v2-912-current-talk `
+  -PackageDirectory .\artifacts\packages-v2-912-production `
   -ExpectedPackageVersion 9.1.2
 ```
 
@@ -284,10 +289,10 @@ git ls-files --eol:
 ```
 
 Local candidate override는 candidate smoke만을 위해 임의 revision을 허용하므로 위 실험은
-가능했지만, production revision 증거에는 working-copy hash를 사용하지 않는다. 새 Hermes
-candidate와 Sharlayan embedded fixture에는 LF 고정 규칙이 적용되었다. 현재 embedded SHA-256은
-canonical candidate와 같은
-`cbf5e08e2bcfe214f5ee42f634dd6cf23939afcb056904bfd838bf0fd9a186af`이다.
+가능했지만, production revision 증거에는 working-copy hash를 사용하지 않는다. Hermes
+production manifest와 Sharlayan embedded fixture에는 LF 고정 규칙이 적용되었다. 현재 embedded
+SHA-256은 public production object와 같은
+`419248bf2ef93aa64e72723ea9e97d5503163178dab63e90a8155b359ebcf96d`이다.
 
 ## 최종 진행 순서
 
@@ -351,7 +356,7 @@ dotnet run --project tools\Sharlayan.LiveSmoke\Sharlayan.LiveSmoke.csproj `
 UTF-16 length만 기록한다. 대사창을 닫은 뒤 `--attach-only --require-last-talk`도 별도로 실행해
 `Source=Last`, `IsVisible=False` 폴백 값을 확인한다.
 
-### 4. Publish 입력값 수집
+### 4. Publish 입력값 수집 — 완료
 
 ```powershell
 $ffxivProcess = Get-Process ffxiv_dx11 | Select-Object -First 1
@@ -368,7 +373,7 @@ $verifierCommit
 `executableSha256`은 64자리 lowercase hex, `verifierCommit`은 Sharlayan의 40자리 lowercase
 commit SHA여야 한다.
 
-### 5. Hermes production promote
+### 5. Hermes production promote — 완료
 
 `ffxiv-hermes`의 Actions에서 `Publish Hermes v2`를 `main` ref로 수동 실행한다.
 
@@ -384,7 +389,7 @@ verifier_commit: <Sharlayan smoke commit SHA>
 deployment branch `main`이 설정되어 있다. Publish workflow는 immutable object를 먼저 올리고
 read-back checksum을 확인한 다음 latest pointer를 마지막에 교체한다.
 
-### 6. Embedded production manifest 동기화
+### 6. Embedded production manifest 동기화 — 완료
 
 Promote 성공 후 Hermes가 기록한 live-verified immutable manifest byte를
 `Sharlayan/Resources/HermesV2/embedded.json`으로 복사한다. Candidate를 embedded final로
@@ -398,7 +403,8 @@ Promote 성공 후 Hermes가 기록한 live-verified immutable manifest byte를
 - 66개 이상의 전체 test 통과
 - multi-target build 및 package verification 통과
 
-그 뒤 Sharlayan.Lite 9.1.2 package release를 진행한다.
+Production package 검증까지 통과했다. Sharlayan.Lite 9.1.2 package의 실제 공개 배포는
+`2026-07-22-05-live-smoke.md`에 남은 release gate를 별도로 확인한 뒤 진행한다.
 
 ## 아직 하지 말아야 할 작업
 
