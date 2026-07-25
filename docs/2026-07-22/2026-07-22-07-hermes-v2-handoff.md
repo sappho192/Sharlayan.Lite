@@ -18,8 +18,9 @@ IronworksTranslator 코드는 이 범위에 포함하지 않는다. 해당 저�
 - 저장소: `D:\REPO\sharlayan`
 - branch: `min-chat`
 - 구현 기준 base: `ced3652 Add live chat smoke validation`
-- currentTalk 구현은 아직 working tree 상태다. commit 후 그 SHA를 새 verifier commit으로 사용한다.
-- smoke 전에 `git status --short`가 비어 있는지 확인하고 `git rev-parse HEAD`를 verifier SHA로 사용한다.
+- currentTalk 구현 및 실제 게임 검증 commit:
+  `3e27261f82851e1e88c413a25461e6ca0ad551e8`
+- 후속 증거 문서 commit과 관계없이 위 코드 commit을 Hermes verifier SHA로 사용한다.
 - 기존 사용자 변경을 버리거나 `git reset --hard`, `git checkout --`로 되돌리지 않는다.
 - `artifacts/`의 로컬 package 결과는 source commit 대상이 아니다.
 
@@ -128,6 +129,36 @@ dotnet pack Sharlayan\Sharlayan.csproj -c Release --no-build `
   -ExpectedPackageVersion 9.1.2
 ```
 
+## 2026-07-25 currentTalk candidate live smoke
+
+검증 기준:
+
+- Sharlayan verifier commit:
+  `3e27261f82851e1e88c413a25461e6ca0ad551e8`
+- Hermes candidate FCS:
+  `8ff04195c4e77ef0b85d15c6fd1c67785378f0fb`
+- candidate revision:
+  `sha256:cbf5e08e2bcfe214f5ee42f634dd6cf23939afcb056904bfd838bf0fd9a186af`
+- process: `ffxiv_dx11`, PID `42976`
+
+확인 결과:
+
+- CHATLOG signature match: 정확히 1개
+- module scan failed read: 0개
+- resolved locations: 4개
+- initialization: 118~131 ms
+- Thancred currentTalk가 실제 화면과 name/text 모두 일치
+- 다음 대사로 진행한 뒤 Urianger currentTalk로 즉시 전환되어 실제 화면과 일치
+- Talk 종료 시 동일 Thancred 값이 `Source=Last`, `IsVisible=False`로 보존됨
+- Urianger Talk를 연 상태로 60초 full smoke 시작과 종료 시 currentTalk 일치
+- 60초 CHATLOG polling: 신규 entry 2개, code `000A`, wrap 0회
+- cursor: `27:2734`에서 `29:2850`으로 진행
+- 최종 결과: `LIVE SMOKE PASS`
+
+대사 전환, current/last 구분 및 current-first reader의 실제 동작은 검증되었다. 다만 candidate
+상태이므로 이 결과만으로 package 공개 또는 Hermes production 승격이 자동 승인되는 것은
+아니다. Sharlayan verifier commit을 push한 뒤 아래 production promote 절차를 진행한다.
+
 ## 2026-07-25 live 진단 결과
 
 FFXIV가 실행 중인 Windows 환경에서 candidate와 verifier `4d38d25`를 사용해 실제 메모리를
@@ -221,8 +252,8 @@ TalkMemoryReaderTests: net8.0 3 PASS, net10.0 3 PASS
 ```
 
 이 실험 수정은 진단 당시 원복했지만, 아래 요구사항은 2026-07-25 currentTalk 구현에 정식으로
-반영되었다. 자동 검증은 통과했으나 아직 commit 및 실제 게임 live smoke 전이므로 production
-verifier SHA로 사용할 수는 없다.
+반영되었다. 자동 검증과 실제 게임 live smoke를 모두 통과한
+`3e27261f82851e1e88c413a25461e6ca0ad551e8`을 production verifier SHA로 사용한다.
 
 ### Sharlayan 구현 결과
 
@@ -235,8 +266,8 @@ verifier SHA로 사용할 수는 없다.
 5. `StringLength=0`, `BufUsed>1`인 실제 관측 형태와 inline/heap 양쪽을 unit test fixture에
    반영했다. null 누락, oversize, invalid UTF-8 및 header race gate도 유지한다.
 6. runtime plan과 API 설명에서 “exact StringLength” 의존 표현을 실제 규칙에 맞게 고쳤다.
-7. multi-target build/test/package verification은 통과했다. 새 verifier commit을 만든 뒤
-   attach-only와 60초 CHATLOG+Talk smoke를 다시 실행하는 일만 남았다.
+7. multi-target build/test/package verification, attach-only current/last 검증 및 60초
+   CHATLOG+currentTalk smoke가 모두 통과했다.
 
 ### Windows candidate byte 주의
 
@@ -258,23 +289,20 @@ candidate와 Sharlayan embedded fixture에는 LF 고정 규칙이 적용되었�
 canonical candidate와 같은
 `cbf5e08e2bcfe214f5ee42f634dd6cf23939afcb056904bfd838bf0fd9a186af`이다.
 
-## 다음 세션의 권장 순서
+## 최종 진행 순서
 
-### 1. Verifier commit 확인
+### 1. Verifier commit 확인 — 완료
 
-working tree가 clean인지 확인하고 현재 HEAD를 기록한다. smoke 전에 코드가 변경되면 전체 자동
-검증을 다시 실행하고 새 commit을 verifier SHA로 사용한다.
+실제 게임 smoke에 사용한 코드 commit은 다음과 같다.
 
-다음 값을 기록한다.
-
-```powershell
-git rev-parse HEAD
+```text
+3e27261f82851e1e88c413a25461e6ca0ad551e8
 ```
 
-이 SHA가 Hermes publish의 `verifier_commit` 입력이다. Push는 별도 세션 사용자와 scope를
-확인한 뒤 수행한다.
+후속 증거 문서 commit이 생겨도 Hermes publish의 `verifier_commit`에는 위 SHA를 사용한다.
+Production promote 전 이 commit을 remote에 push해야 한다.
 
-### 2. Attach-only Talk smoke
+### 2. Attach-only Talk smoke — 완료
 
 FFXIV에 로그인하고 표준 NPC Talk 창을 연 상태에서 실행한다. 게임 로그인에는 2FA와 GPU
 환경이 필요하므로 이 검증은 수동으로 유지한다.
@@ -298,7 +326,7 @@ dotnet run --project tools\Sharlayan.LiveSmoke\Sharlayan.LiveSmoke.csproj `
 - `--print-talk` name/text가 실제 화면과 일치
 - `LIVE ATTACH PASS`
 
-### 3. Full CHATLOG + Talk smoke
+### 3. Full CHATLOG + Talk smoke — 완료
 
 NPC Talk가 열린 상태를 유지하고 60초 동안 새 chat entry가 생기도록 게임 내 채팅 또는 시스템
 메시지를 발생시킨다.
