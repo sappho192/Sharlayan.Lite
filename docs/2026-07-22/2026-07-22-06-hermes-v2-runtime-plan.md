@@ -352,6 +352,14 @@ CHATLOG, Talk name 및 Talk text는 같은 Framework pattern을 공유한다.
 
 ## 14. Talk API
 
+### 2026-07-25 currentTalk 보완
+
+초기 계획의 `LastTalkName`/`LastTalkText`는 마지막으로 확정된 대사를 보존할 뿐, 현재 화면에
+표시 중인 Talk와 동기화되지 않는다. Hermes candidate
+`8ff04195c4e77ef0b85d15c6fd1c67785378f0fb`부터 `currentStandardTalk` 계약을 함께 제공한다.
+Sharlayan의 기본 정책은 현재 보이는 `Talk` addon을 우선하고, 안정적인 current snapshot이
+없을 때만 LastTalk로 폴백한다.
+
 ### 결과 모델
 
 다중 target framework 호환성을 고려하여 단순 immutable 또는 read-only 모델을 추가한다.
@@ -363,32 +371,47 @@ public sealed class TalkResult {
     public bool IsAvailable { get; }
     public string Name { get; }
     public string Text { get; }
+    public TalkSource Source { get; }
+    public bool IsVisible { get; }
 }
 ```
 
 Reader API:
 
 ```csharp
+public bool CanGetTalk();
+public bool CanGetCurrentTalk();
 public bool CanGetLastTalk();
+public TalkResult GetTalk();
+public TalkResult GetCurrentTalk();
 public TalkResult GetLastTalk();
 ```
 
-`IsAvailable`은 메모리 읽기 가능 여부를 의미한다. 대화창이 현재 열려 있다는 의미로 사용하지 않는다.
+`GetTalk()`은 `Current` 우선, `Last` 폴백이다. `IsAvailable`은 메모리 읽기 성공 여부이며,
+현재 창 활성 여부는 `Source=Current`와 `IsVisible=true`로 명시한다.
 
 ### Utf8String 읽기
 
 읽기 순서:
 
-1. `Utf8String` header에서 `StringPtr`, `BufUsed` 및 `StringLength`를 local buffer로 읽는다.
+1. `Utf8String` header에서 `StringPtr`와 `BufUsed`를 local buffer로 읽는다.
 2. pointer가 null인지 확인한다.
-3. length가 음수 또는 configured maximum을 초과하지 않는지 확인한다.
-4. `BufUsed`와 `StringLength` 관계를 sanity check한다.
-5. 실제 length만큼 별도 local buffer로 읽는다.
-6. null terminator와 UTF-8 경계를 처리한다.
-7. header를 다시 읽어 pointer와 length가 바뀌었으면 한 번 재시도한다.
-8. 두 번째 snapshot도 불안정하면 unavailable 결과를 반환한다.
+3. `1 <= BufUsed <= configured maximum + 1`인지 확인한다.
+4. 정확히 `BufUsed`만큼 읽고 마지막 byte가 null인지 확인한다.
+5. null을 제외한 `BufUsed - 1` byte를 strict UTF-8로 decode한다.
+6. header를 다시 읽어 `StringPtr` 또는 `BufUsed`가 바뀌었으면 한 번 재시도한다.
+7. 두 번째 snapshot도 불안정하면 unavailable 결과를 반환한다.
 
 이 구현은 현재 `GetString(..., 2048)`의 전체 범위 read 실패, 임의 truncation 및 UTF-8 중간 절단 문제를 제거한다.
+
+### 현재 Talk addon 읽기
+
+각 호출은 manifest offset을 사용해 `UIModule → RaptureAtkModule →
+RaptureAtkUnitManager → AllLoadedUnitsList`를 다시 순회한다. 이름이 정확히 `Talk`이고
+visibility/readiness mask가 모두 설정된 addon만 인정한다. `AtkValues[0]` text와 `[1]` name이
+허용된 string type인지 확인하고 bounded null-terminated strict UTF-8로 읽는다. root pointer,
+unit count/entry, addon 상태, AtkValues pointer/count/type/string pointer의 before/after
+snapshot과 두 번 읽은 string byte가 모두 같을 때만 `Source=Current`를 반환한다.
 
 ### 동시성
 
@@ -596,11 +619,12 @@ FallbackReason
 
 ### Phase 4: Talk API
 
-- [ ] Talk name 및 text location 매핑
-- [ ] safe `Utf8String` reader 구현
-- [ ] `TalkResult`, `CanGetLastTalk`, `GetLastTalk` 추가
-- [ ] snapshot retry와 length 제한 구현
-- [ ] Talk 단위 테스트 추가
+- [x] LastTalk name 및 text location 매핑
+- [x] `BufUsed - 1` 기반 safe `Utf8String` reader 구현
+- [x] current Talk addon 순회와 stable snapshot reader 구현
+- [x] `TalkResult.Source`, `IsVisible` 및 current-first API 추가
+- [x] snapshot retry와 length 제한 구현
+- [x] Talk 단위 테스트 추가
 - [ ] CHATLOG와 Talk 동시 호출 테스트 추가
 
 완료 조건:

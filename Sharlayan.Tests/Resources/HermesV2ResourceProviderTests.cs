@@ -26,7 +26,7 @@ namespace Sharlayan.Tests.Resources {
                     schemaVersion = 2,
                     resourceRevision = revision,
                     manifest = "manifests/" + revision + ".json",
-                    fcsCommit = "15ae1806b0c175d1e2dd2ae845e4c853f332fd07",
+                    fcsCommit = "8ff04195c4e77ef0b85d15c6fd1c67785378f0fb",
                     publishedAt = "2026-07-22T00:00:00Z",
                 }));
                 FakeTransport transport = new FakeTransport(
@@ -163,7 +163,7 @@ namespace Sharlayan.Tests.Resources {
                 schemaVersion = 2,
                 resourceRevision = revision,
                 manifest = "manifests/" + revision + ".json",
-                fcsCommit = "15ae1806b0c175d1e2dd2ae845e4c853f332fd07",
+                fcsCommit = "8ff04195c4e77ef0b85d15c6fd1c67785378f0fb",
                 publishedAt = "2026-07-22T00:00:00Z",
             }));
         }

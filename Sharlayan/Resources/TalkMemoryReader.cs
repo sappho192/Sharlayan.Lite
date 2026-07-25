@@ -37,7 +37,9 @@ namespace Sharlayan.Resources {
                     return new TalkResult(
                         true,
                         StrictUtf8.GetString(nameBytes, 0, nameBytes.Length),
-                        StrictUtf8.GetString(textBytes, 0, textBytes.Length));
+                        StrictUtf8.GetString(textBytes, 0, textBytes.Length),
+                        TalkSource.Last,
+                        false);
                 }
                 catch (DecoderFallbackException) {
                     return TalkResult.Unavailable;
@@ -56,51 +58,46 @@ namespace Sharlayan.Resources {
 
             long pointer = BitConverter.ToInt64(bytes, layout.StringPointerOffset);
             long bufferUsed = BitConverter.ToInt64(bytes, layout.BufferUsedOffset);
-            long stringLength = BitConverter.ToInt64(bytes, layout.StringLengthOffset);
             if (pointer == 0
-                || stringLength < 0
-                || stringLength > MaximumStringBytes
-                || bufferUsed < stringLength
+                || bufferUsed < 1
                 || bufferUsed > MaximumStringBytes + 1L) {
                 header = default(Header);
                 return false;
             }
 
-            header = new Header(new IntPtr(pointer), (int)bufferUsed, (int)stringLength);
+            header = new Header(new IntPtr(pointer), (int)bufferUsed);
             return true;
         }
 
         private static bool TryReadBytes(MemoryPeek peek, Header header, out byte[] value) {
-            int readLength = header.BufferUsed > header.StringLength ? header.StringLength + 1 : header.StringLength;
+            int readLength = header.BufferUsed;
             byte[] bytes = new byte[readLength];
-            if (readLength > 0 && !peek(header.Pointer, bytes, readLength)) {
+            if (!peek(header.Pointer, bytes, readLength)) {
                 value = null;
                 return false;
             }
 
-            if (readLength > header.StringLength && bytes[header.StringLength] != 0) {
+            if (bytes[readLength - 1] != 0) {
                 value = null;
                 return false;
             }
 
-            value = new byte[header.StringLength];
+            value = new byte[readLength - 1];
             if (value.Length > 0) Buffer.BlockCopy(bytes, 0, value, 0, value.Length);
             return true;
         }
 
         private struct Header : IEquatable<Header> {
-            internal Header(IntPtr pointer, int bufferUsed, int stringLength) {
+            internal Header(IntPtr pointer, int bufferUsed) {
                 this.Pointer = pointer;
                 this.BufferUsed = bufferUsed;
-                this.StringLength = stringLength;
             }
 
             internal IntPtr Pointer { get; }
             internal int BufferUsed { get; }
-            internal int StringLength { get; }
 
             public bool Equals(Header other) {
-                return this.Pointer == other.Pointer && this.BufferUsed == other.BufferUsed && this.StringLength == other.StringLength;
+                return this.Pointer == other.Pointer && this.BufferUsed == other.BufferUsed;
             }
         }
     }

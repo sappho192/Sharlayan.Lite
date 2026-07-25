@@ -102,17 +102,19 @@ public class ChatLogResult
 ## Standard NPC Talk Reading
 
 ```csharp
-if (memoryHandler.Reader.CanGetLastTalk()) {
-    TalkResult talk = memoryHandler.Reader.GetLastTalk();
+if (memoryHandler.Reader.CanGetTalk()) {
+    TalkResult talk = memoryHandler.Reader.GetTalk();
     if (talk.IsAvailable) {
-        Console.WriteLine($"{talk.Name}: {talk.Text}");
+        Console.WriteLine($"{talk.Source} (visible={talk.IsVisible}): {talk.Name}: {talk.Text}");
     }
 }
 ```
 
-The result represents FCS `LastTalkName` and `LastTalkText`. It does not claim that the Talk window is
-currently open. Applications should baseline the first value after attach before treating changes as new
-dialogue.
+`GetTalk()` returns the visible standard `Talk` addon first (`Source=Current`, `IsVisible=true`) and falls
+back to FCS `LastTalkName`/`LastTalkText` (`Source=Last`, `IsVisible=false`) when no stable current Talk is
+available. Use `GetCurrentTalk()` or `GetLastTalk()` when the distinction is part of the caller's policy.
+Applications consuming the last value should baseline the first value after attach before treating changes
+as new dialogue.
 
 The selected resource can be inspected through `memoryHandler.ResourceInfo`, including its source,
 revision, FCS/generator commits, validation status, resolved location count, and fallback reason.

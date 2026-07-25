@@ -23,6 +23,8 @@ namespace Sharlayan {
 
         public const string CHATLOG_KEY = "CHATLOG";
 
+        public const string CURRENT_TALK_UI_MODULE_POINTER_KEY = "CURRENT_TALK_UI_MODULE_POINTER";
+
         public const string LAST_TALK_NAME_KEY = "LAST_TALK_NAME";
 
         public const string LAST_TALK_TEXT_KEY = "LAST_TALK_TEXT";

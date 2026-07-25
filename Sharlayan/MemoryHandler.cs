@@ -94,6 +94,8 @@ namespace Sharlayan {
 
         internal TalkMemoryLayout TalkLayout { get; private set; }
 
+        internal CurrentTalkMemoryLayout CurrentTalkLayout { get; private set; }
+
         private List<ProcessModule> _systemModules { get; } = new List<ProcessModule>();
 
         public void Dispose() {
@@ -394,6 +396,7 @@ namespace Sharlayan {
 
                 this.Structures = mapped.Structures;
                 this.TalkLayout = mapped.TalkLayout;
+                this.CurrentTalkLayout = mapped.CurrentTalkLayout;
                 this.Scanner = scanner;
                 this.ResourceInfo = new ResourceInfo(
                     candidate.Info.Source,

@@ -19,8 +19,8 @@ namespace Sharlayan.Tests.Resources {
             HermesV2Manifest manifest = HermesV2ManifestParser.ParseManifest(bytes, null, "9.1.2", allowCandidate: true);
 
             Assert.Equal(2, manifest.SchemaVersion);
-            Assert.Equal("15ae1806b0c175d1e2dd2ae845e4c853f332fd07", manifest.Source.FcsCommit);
-            Assert.Equal("sha256:fe5330592a8e4fcf1912b76b28d9338571356185a8888ae91b97fff497c6f994", HermesV2ManifestParser.CalculateRevision(bytes));
+            Assert.Equal("8ff04195c4e77ef0b85d15c6fd1c67785378f0fb", manifest.Source.FcsCommit);
+            Assert.Equal("sha256:cbf5e08e2bcfe214f5ee42f634dd6cf23939afcb056904bfd838bf0fd9a186af", HermesV2ManifestParser.CalculateRevision(bytes));
         }
 
         [Fact]
@@ -79,14 +79,32 @@ namespace Sharlayan.Tests.Resources {
         }
 
         [Fact]
-        public void ParserIgnoresTypedOptionalResources() {
+        public void ParserRejectsInvalidCurrentTalkAndLengthContracts() {
+            JObject wrongLengthSource = JObject.Parse(Encoding.UTF8.GetString(ReadEmbeddedFixture()));
+            wrongLengthSource["resources"]["talk"]["utf8String"]["lengthSource"] = "stringLength";
+            JObject wrongCurrentType = JObject.Parse(Encoding.UTF8.GetString(ReadEmbeddedFixture()));
+            wrongCurrentType["resources"]["currentTalk"]["atkValue"]["allowedStringTypes"] = new JArray(3);
+
+            Assert.Throws<InvalidDataException>(() => HermesV2ManifestParser.ParseManifest(
+                Encoding.UTF8.GetBytes(wrongLengthSource.ToString(Newtonsoft.Json.Formatting.None)),
+                null,
+                "9.1.2",
+                allowCandidate: true));
+            Assert.Throws<InvalidDataException>(() => HermesV2ManifestParser.ParseManifest(
+                Encoding.UTF8.GetBytes(wrongCurrentType.ToString(Newtonsoft.Json.Formatting.None)),
+                null,
+                "9.1.2",
+                allowCandidate: true));
+        }
+
+        [Fact]
+        public void ParserRejectsUnexpectedResources() {
             JObject json = JObject.Parse(Encoding.UTF8.GetString(ReadEmbeddedFixture()));
             json["resources"]["talkSubtitle"] = new JObject { ["future"] = true };
             byte[] bytes = Encoding.UTF8.GetBytes(json.ToString(Newtonsoft.Json.Formatting.None));
 
-            HermesV2Manifest manifest = HermesV2ManifestParser.ParseManifest(bytes, null, "9.1.2", allowCandidate: true);
-
-            Assert.True(manifest.Resources.OptionalResources.ContainsKey("talkSubtitle"));
+            Assert.Throws<InvalidDataException>(() =>
+                HermesV2ManifestParser.ParseManifest(bytes, null, "9.1.2", allowCandidate: true));
         }
 
         [Fact]
@@ -95,14 +113,27 @@ namespace Sharlayan.Tests.Resources {
 
             HermesMappedResources mapped = HermesV2ResourceMapper.Map(manifest);
 
-            Assert.Equal(3, mapped.Signatures.Length);
-            Assert.Equal(new[] { Signatures.CHATLOG_KEY, Signatures.LAST_TALK_NAME_KEY, Signatures.LAST_TALK_TEXT_KEY }, mapped.Signatures.Select(signature => signature.Key));
+            Assert.Equal(4, mapped.Signatures.Length);
+            Assert.Equal(
+                new[] {
+                    Signatures.CHATLOG_KEY,
+                    Signatures.LAST_TALK_NAME_KEY,
+                    Signatures.LAST_TALK_TEXT_KEY,
+                    Signatures.CURRENT_TALK_UI_MODULE_POINTER_KEY,
+                },
+                mapped.Signatures.Select(signature => signature.Key));
             Assert.All(mapped.Signatures, signature => Assert.Equal("488B1D????????8B7C24", signature.Value));
             Assert.Equal(new long[] { -7, 0, 0x2B68, 0x1AC0 }, mapped.Signatures[0].PointerPath);
             Assert.Equal(new long[] { -7, 0, 0x2B68, 0xFEF00 }, mapped.Signatures[1].PointerPath);
+            Assert.Equal(new long[] { -7, 0, 0x2B68 }, mapped.Signatures[3].PointerPath);
             Assert.Equal(0x48, mapped.Structures.ChatLogPointers.OffsetArrayStart);
             Assert.Equal(0x70, mapped.Structures.ChatLogPointers.LogEnd);
-            Assert.Equal(0x18, mapped.TalkLayout.StringLengthOffset);
+            Assert.Equal(0x18, mapped.TalkLayout.HeaderSize);
+            Assert.Equal(861808, mapped.CurrentTalkLayout.RaptureAtkModuleOffset);
+            Assert.Equal(78880, mapped.CurrentTalkLayout.RaptureAtkUnitManagerOffset);
+            Assert.Equal(26880, mapped.CurrentTalkLayout.AllLoadedUnitsListOffset);
+            Assert.Equal(0x200000u, mapped.CurrentTalkLayout.VisibilityMask);
+            Assert.Equal(new[] { 0x28 }, mapped.CurrentTalkLayout.AllowedStringTypes);
         }
 
         internal static byte[] CreateLiveManifest(string minimumVersion = "9.1.2") {

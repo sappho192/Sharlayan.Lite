@@ -111,6 +111,7 @@ namespace Sharlayan.Resources {
             RequireBoolean(framework, "isPointer", "$.roots.framework.");
 
             JObject resources = RequireObject(root, "resources", "$.");
+            ValidateObject(resources, "$.resources", "chatLog", "talk", "currentTalk");
             JObject chatLog = RequireObject(resources, "chatLog", "$.resources.");
             ValidateObject(chatLog, "$.resources.chatLog", "root", "uiModuleOffset", "raptureLogModuleOffset", "indexVectorOffset", "dataVectorOffset");
             RequireString(chatLog, "root", "$.resources.chatLog.");
@@ -127,10 +128,76 @@ namespace Sharlayan.Resources {
             RequireInteger(talk, "nameOffset", "$.resources.talk.");
             RequireInteger(talk, "textOffset", "$.resources.talk.");
             JObject utf8String = RequireObject(talk, "utf8String", "$.resources.talk.");
-            ValidateObject(utf8String, "$.resources.talk.utf8String", "stringPointerOffset", "bufferUsedOffset", "stringLengthOffset");
+            ValidateObject(utf8String, "$.resources.talk.utf8String", "stringPointerOffset", "bufferUsedOffset", "lengthSource");
             RequireInteger(utf8String, "stringPointerOffset", "$.resources.talk.utf8String.");
             RequireInteger(utf8String, "bufferUsedOffset", "$.resources.talk.utf8String.");
-            RequireInteger(utf8String, "stringLengthOffset", "$.resources.talk.utf8String.");
+            RequireString(utf8String, "lengthSource", "$.resources.talk.utf8String.");
+
+            JObject currentTalk = RequireObject(resources, "currentTalk", "$.resources.");
+            ValidateObject(
+                currentTalk,
+                "$.resources.currentTalk",
+                "root",
+                "semantics",
+                "uiModuleOffset",
+                "raptureAtkModuleOffset",
+                "raptureAtkUnitManagerOffset",
+                "allLoadedUnitsListOffset",
+                "atkUnitList",
+                "atkUnitBase",
+                "atkValue",
+                "addonName",
+                "textValueIndex",
+                "nameValueIndex");
+            RequireString(currentTalk, "root", "$.resources.currentTalk.");
+            RequireString(currentTalk, "semantics", "$.resources.currentTalk.");
+            RequireInteger(currentTalk, "uiModuleOffset", "$.resources.currentTalk.");
+            RequireInteger(currentTalk, "raptureAtkModuleOffset", "$.resources.currentTalk.");
+            RequireInteger(currentTalk, "raptureAtkUnitManagerOffset", "$.resources.currentTalk.");
+            RequireInteger(currentTalk, "allLoadedUnitsListOffset", "$.resources.currentTalk.");
+            RequireString(currentTalk, "addonName", "$.resources.currentTalk.");
+            RequireInteger(currentTalk, "textValueIndex", "$.resources.currentTalk.");
+            RequireInteger(currentTalk, "nameValueIndex", "$.resources.currentTalk.");
+
+            JObject atkUnitList = RequireObject(currentTalk, "atkUnitList", "$.resources.currentTalk.");
+            ValidateObject(atkUnitList, "$.resources.currentTalk.atkUnitList", "entriesOffset", "countOffset", "capacity", "entrySize");
+            RequireInteger(atkUnitList, "entriesOffset", "$.resources.currentTalk.atkUnitList.");
+            RequireInteger(atkUnitList, "countOffset", "$.resources.currentTalk.atkUnitList.");
+            RequireInteger(atkUnitList, "capacity", "$.resources.currentTalk.atkUnitList.");
+            RequireInteger(atkUnitList, "entrySize", "$.resources.currentTalk.atkUnitList.");
+
+            JObject atkUnitBase = RequireObject(currentTalk, "atkUnitBase", "$.resources.currentTalk.");
+            ValidateObject(
+                atkUnitBase,
+                "$.resources.currentTalk.atkUnitBase",
+                "nameOffset",
+                "nameCapacity",
+                "visibilityStateOffset",
+                "visibilityMask",
+                "readinessOffset",
+                "readinessMask",
+                "atkValuesPointerOffset",
+                "atkValuesCountOffset");
+            RequireInteger(atkUnitBase, "nameOffset", "$.resources.currentTalk.atkUnitBase.");
+            RequireInteger(atkUnitBase, "nameCapacity", "$.resources.currentTalk.atkUnitBase.");
+            RequireInteger(atkUnitBase, "visibilityStateOffset", "$.resources.currentTalk.atkUnitBase.");
+            RequireInteger(atkUnitBase, "visibilityMask", "$.resources.currentTalk.atkUnitBase.");
+            RequireInteger(atkUnitBase, "readinessOffset", "$.resources.currentTalk.atkUnitBase.");
+            RequireInteger(atkUnitBase, "readinessMask", "$.resources.currentTalk.atkUnitBase.");
+            RequireInteger(atkUnitBase, "atkValuesPointerOffset", "$.resources.currentTalk.atkUnitBase.");
+            RequireInteger(atkUnitBase, "atkValuesCountOffset", "$.resources.currentTalk.atkUnitBase.");
+
+            JObject atkValue = RequireObject(currentTalk, "atkValue", "$.resources.currentTalk.");
+            ValidateObject(atkValue, "$.resources.currentTalk.atkValue", "size", "typeOffset", "valueOffset", "allowedStringTypes");
+            RequireInteger(atkValue, "size", "$.resources.currentTalk.atkValue.");
+            RequireInteger(atkValue, "typeOffset", "$.resources.currentTalk.atkValue.");
+            RequireInteger(atkValue, "valueOffset", "$.resources.currentTalk.atkValue.");
+            JArray allowedStringTypes = RequireArray(atkValue, "allowedStringTypes", "$.resources.currentTalk.atkValue.");
+            foreach (JToken value in allowedStringTypes) {
+                if (value.Type != JTokenType.Integer) {
+                    throw new InvalidDataException("$.resources.currentTalk.atkValue.allowedStringTypes must contain integers.");
+                }
+            }
 
             JObject validation = RequireObject(root, "validation", "$.");
             string status = RequireString(validation, "status", "$.validation.");
@@ -167,6 +234,15 @@ namespace Sharlayan.Resources {
             JToken token = value[propertyName];
             if (!(token is JObject result)) {
                 throw new InvalidDataException(path + propertyName + " must be an object.");
+            }
+
+            return result;
+        }
+
+        private static JArray RequireArray(JObject value, string propertyName, string path) {
+            JToken token = value[propertyName];
+            if (!(token is JArray result)) {
+                throw new InvalidDataException(path + propertyName + " must be an array.");
             }
 
             return result;
@@ -243,7 +319,12 @@ namespace Sharlayan.Resources {
 
             HermesChatLogResource chat = manifest.Resources?.ChatLog ?? throw new InvalidDataException("CHATLOG resource is missing.");
             HermesTalkResource talk = manifest.Resources?.Talk ?? throw new InvalidDataException("Talk resource is missing.");
-            if (chat.Root != "framework" || talk.Root != "framework" || talk.Semantics != "lastStandardTalk") {
+            HermesCurrentTalkResource currentTalk = manifest.Resources?.CurrentTalk ?? throw new InvalidDataException("CurrentTalk resource is missing.");
+            if (chat.Root != "framework"
+                || talk.Root != "framework"
+                || talk.Semantics != "lastStandardTalk"
+                || currentTalk.Root != "framework"
+                || currentTalk.Semantics != "currentStandardTalk") {
                 throw new InvalidDataException("Hermes resource semantics are invalid.");
             }
 
@@ -254,7 +335,12 @@ namespace Sharlayan.Resources {
             ValidateOffset(talk.UiModuleOffset, nameof(talk.UiModuleOffset));
             ValidateOffset(talk.NameOffset, nameof(talk.NameOffset));
             ValidateOffset(talk.TextOffset, nameof(talk.TextOffset));
+            ValidateOffset(currentTalk.UiModuleOffset, nameof(currentTalk.UiModuleOffset));
+            ValidateOffset(currentTalk.RaptureAtkModuleOffset, nameof(currentTalk.RaptureAtkModuleOffset));
+            ValidateOffset(currentTalk.RaptureAtkUnitManagerOffset, nameof(currentTalk.RaptureAtkUnitManagerOffset));
+            ValidateOffset(currentTalk.AllLoadedUnitsListOffset, nameof(currentTalk.AllLoadedUnitsListOffset));
             if (chat.UiModuleOffset != talk.UiModuleOffset
+                || chat.UiModuleOffset != currentTalk.UiModuleOffset
                 || chat.IndexVectorOffset % 8 != 0
                 || chat.DataVectorOffset % 8 != 0
                 || Math.Abs(chat.DataVectorOffset - chat.IndexVectorOffset) < 24) {
@@ -264,12 +350,54 @@ namespace Sharlayan.Resources {
             HermesUtf8StringLayout utf8 = talk.Utf8String ?? throw new InvalidDataException("Utf8String layout is missing.");
             ValidateOffset(utf8.StringPointerOffset, nameof(utf8.StringPointerOffset));
             ValidateOffset(utf8.BufferUsedOffset, nameof(utf8.BufferUsedOffset));
-            ValidateOffset(utf8.StringLengthOffset, nameof(utf8.StringLengthOffset));
             if (utf8.StringPointerOffset % 8 != 0
                 || utf8.BufferUsedOffset % 8 != 0
-                || utf8.StringLengthOffset % 8 != 0
-                || !(utf8.StringPointerOffset < utf8.BufferUsedOffset && utf8.BufferUsedOffset < utf8.StringLengthOffset)) {
+                || utf8.StringPointerOffset >= utf8.BufferUsedOffset
+                || utf8.LengthSource != "bufferUsedMinusNull") {
                 throw new InvalidDataException("Utf8String layout is invalid.");
+            }
+
+            HermesAtkUnitListLayout unitList = currentTalk.AtkUnitList ?? throw new InvalidDataException("CurrentTalk AtkUnitList layout is missing.");
+            ValidateOffset(unitList.EntriesOffset, nameof(unitList.EntriesOffset));
+            ValidateOffset(unitList.CountOffset, nameof(unitList.CountOffset));
+            if (unitList.Capacity < 1
+                || unitList.Capacity > 4096
+                || unitList.EntrySize != 8
+                || unitList.EntriesOffset % unitList.EntrySize != 0
+                || unitList.CountOffset != unitList.EntriesOffset + ((long) unitList.Capacity * unitList.EntrySize)) {
+                throw new InvalidDataException("CurrentTalk AtkUnitList layout is invalid.");
+            }
+
+            HermesAtkUnitBaseLayout addon = currentTalk.AtkUnitBase ?? throw new InvalidDataException("CurrentTalk AtkUnitBase layout is missing.");
+            ValidateOffset(addon.NameOffset, nameof(addon.NameOffset));
+            ValidateOffset(addon.VisibilityStateOffset, nameof(addon.VisibilityStateOffset));
+            ValidateOffset(addon.ReadinessOffset, nameof(addon.ReadinessOffset));
+            ValidateOffset(addon.AtkValuesPointerOffset, nameof(addon.AtkValuesPointerOffset));
+            ValidateOffset(addon.AtkValuesCountOffset, nameof(addon.AtkValuesCountOffset));
+            if (addon.NameCapacity < 1
+                || addon.NameCapacity > 256
+                || addon.NameOffset + (long) addon.NameCapacity > addon.AtkValuesPointerOffset
+                || addon.AtkValuesPointerOffset % 8 != 0
+                || addon.VisibilityMask == 0
+                || addon.ReadinessMask == 0) {
+                throw new InvalidDataException("CurrentTalk AtkUnitBase layout is invalid.");
+            }
+
+            HermesAtkValueLayout atkValue = currentTalk.AtkValue ?? throw new InvalidDataException("CurrentTalk AtkValue layout is missing.");
+            ValidateOffset(atkValue.TypeOffset, nameof(atkValue.TypeOffset));
+            ValidateOffset(atkValue.ValueOffset, nameof(atkValue.ValueOffset));
+            if (atkValue.Size < 1
+                || atkValue.Size > 256
+                || atkValue.TypeOffset + sizeof(int) > atkValue.Size
+                || atkValue.ValueOffset % 8 != 0
+                || atkValue.ValueOffset + 8 > atkValue.Size
+                || atkValue.AllowedStringTypes == null
+                || atkValue.AllowedStringTypes.Count != 1
+                || atkValue.AllowedStringTypes[0] != 0x28
+                || currentTalk.AddonName != "Talk"
+                || currentTalk.TextValueIndex != 0
+                || currentTalk.NameValueIndex != 1) {
+                throw new InvalidDataException("CurrentTalk AtkValue semantics are invalid.");
             }
 
             HermesValidation validation = manifest.Validation ?? throw new InvalidDataException("Validation metadata is missing.");

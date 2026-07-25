@@ -97,17 +97,28 @@ internal static class Program {
 
                 Console.WriteLine($"First poll: empty, cursor={firstPoll.PreviousArrayIndex}:{firstPoll.PreviousOffset}");
 
+                if (options.RequireCurrentTalk) {
+                    ValidateTalk(
+                        "CurrentTalk",
+                        handler.Reader.CanGetCurrentTalk(),
+                        handler.Reader.GetCurrentTalk(),
+                        options.PrintTalk);
+                }
+
+                if (options.RequireLastTalk) {
+                    ValidateTalk(
+                        "LastTalk",
+                        handler.Reader.CanGetLastTalk(),
+                        handler.Reader.GetLastTalk(),
+                        options.PrintTalk);
+                }
+
                 if (options.RequireTalk) {
-                    if (!handler.Reader.CanGetLastTalk()) {
-                        throw new InvalidOperationException("Talk locations were not resolved.");
-                    }
-
-                    TalkResult talk = handler.Reader.GetLastTalk();
-                    if (!talk.IsAvailable || string.IsNullOrEmpty(talk.Text)) {
-                        throw new InvalidOperationException("No readable standard Talk value is available. Open an NPC Talk and retry.");
-                    }
-
-                    Console.WriteLine($"Talk: available, nameUtf16Length={talk.Name.Length}, textUtf16Length={talk.Text.Length}");
+                    ValidateTalk(
+                        "Talk",
+                        handler.Reader.CanGetTalk(),
+                        handler.Reader.GetTalk(),
+                        options.PrintTalk);
                 }
 
                 if (options.AttachOnly) {
@@ -284,6 +295,23 @@ internal static class Program {
         }
     }
 
+    private static void ValidateTalk(string label, bool canRead, TalkResult talk, bool printTalk) {
+        if (!canRead) {
+            throw new InvalidOperationException($"{label} locations were not resolved.");
+        }
+
+        if (!talk.IsAvailable || string.IsNullOrEmpty(talk.Text)) {
+            throw new InvalidOperationException($"No readable {label} value is available. Open an NPC Talk and retry.");
+        }
+
+        Console.WriteLine(
+            $"{label}: available, source={talk.Source}, visible={talk.IsVisible}, nameUtf16Length={talk.Name.Length}, textUtf16Length={talk.Text.Length}");
+        if (printTalk) {
+            Console.WriteLine($"{label} name: {talk.Name}");
+            Console.WriteLine($"{label} text: {talk.Text}");
+        }
+    }
+
     private sealed class Options {
         public int InitializationTimeoutSeconds { get; private set; } = 30;
 
@@ -296,6 +324,12 @@ internal static class Program {
         public int? ProcessId { get; private set; }
 
         public string? ManifestPath { get; private set; }
+
+        public bool PrintTalk { get; private set; }
+
+        public bool RequireCurrentTalk { get; private set; }
+
+        public bool RequireLastTalk { get; private set; }
 
         public bool RequireTalk { get; private set; }
 
@@ -323,6 +357,15 @@ internal static class Program {
                         break;
                     case "--require-talk":
                         options.RequireTalk = true;
+                        break;
+                    case "--require-current-talk":
+                        options.RequireCurrentTalk = true;
+                        break;
+                    case "--require-last-talk":
+                        options.RequireLastTalk = true;
+                        break;
+                    case "--print-talk":
+                        options.PrintTalk = true;
                         break;
                     default:
                         throw new ArgumentException($"Unknown argument '{args[index]}'.");
