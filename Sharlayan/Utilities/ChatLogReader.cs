@@ -127,17 +127,21 @@ namespace Sharlayan.Utilities {
             return (int) capacity;
         }
 
-        public void EnsureArrayIndexes(int capacity) {
-            if (capacity <= 0 || capacity > MaxArrayCapacity) {
-                throw new ArgumentOutOfRangeException(nameof(capacity));
-            }
-
-            int byteLength = checked(capacity * sizeof(int));
-            if (this._indexBuffer.Length != byteLength) {
-                this._indexBuffer = new byte[byteLength];
+        public void EnsureArrayIndexes(int count) {
+            if (count < 0 || count > MaxArrayCapacity) {
+                throw new ArgumentOutOfRangeException(nameof(count));
             }
 
             this.Indexes.Clear();
+
+            int byteLength = checked(count * sizeof(int));
+            if (byteLength == 0) {
+                return;
+            }
+
+            if (this._indexBuffer.Length != byteLength) {
+                this._indexBuffer = new byte[byteLength];
+            }
 
             Array.Clear(this._indexBuffer, 0, this._indexBuffer.Length);
             this._readBytes(new IntPtr(this.ChatLogPointers.OffsetArrayStart), this._indexBuffer);
@@ -185,6 +189,16 @@ namespace Sharlayan.Utilities {
 
         internal bool HasPointerVectorChanged(int arrayCapacity) {
             return this._hasPointerSnapshot && (this._previousArrayCapacity != arrayCapacity || this._previousOffsetArrayStart != this.ChatLogPointers.OffsetArrayStart || this._previousLogStart != this.ChatLogPointers.LogStart);
+        }
+
+        internal static bool HasSameSnapshot(ChatLogPointers expected, ChatLogPointers actual) {
+            return expected.LineCount == actual.LineCount
+                   && expected.OffsetArrayStart == actual.OffsetArrayStart
+                   && expected.OffsetArrayPos == actual.OffsetArrayPos
+                   && expected.OffsetArrayEnd == actual.OffsetArrayEnd
+                   && expected.LogStart == actual.LogStart
+                   && expected.LogNext == actual.LogNext
+                   && expected.LogEnd == actual.LogEnd;
         }
 
         internal bool IsCursorBoundary(int arrayIndex, int offset) {

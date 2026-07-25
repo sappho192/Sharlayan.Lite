@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       package_version:
-        description: NuGet package version, for example 9.1.3
+        description: NuGet package version, for example 9.1.4
         required: true
         type: string
       publish:
@@ -147,7 +147,7 @@ jobs:
             throw "Expected exactly one symbol package to publish, found $($symbolPackages.Count)."
           }
 
-          dotnet nuget push $packages[0].FullName --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json
+          dotnet nuget push $packages[0].FullName --no-symbols --api-key $env:NUGET_API_KEY --source https://api.nuget.org/v3/index.json
           if ($LASTEXITCODE -ne 0) {
             throw "NuGet push failed with exit code $LASTEXITCODE."
           }

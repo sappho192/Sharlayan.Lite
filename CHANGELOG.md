@@ -1,3 +1,4 @@
+9.1.4 treat CHATLOG StdVector count decreases as resets, ignore stale capacity slots, and retry unstable memory snapshots
 9.1.3 publish current-first standard NPC Talk APIs, .NET 10 assets, package README, and package-contract verification
 9.1.2 add validated Hermes v2 remote/cache/embedded resources and LastTalk reading
 4.0.1 include symbols in package

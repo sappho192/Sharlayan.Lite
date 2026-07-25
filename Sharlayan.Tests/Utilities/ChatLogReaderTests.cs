@@ -1,6 +1,5 @@
 namespace Sharlayan.Tests.Utilities {
     using System;
-    using System.Collections.Generic;
     using System.Linq;
     using System.Text;
     using System.Threading;
@@ -32,18 +31,30 @@ namespace Sharlayan.Tests.Utilities {
                         WriteInt32(destination, i, i * 10);
                     }
                 });
-            reader.ChatLogPointers = CreatePointers(currentArrayIndex: 0, capacity: 3);
+            reader.ChatLogPointers = CreatePointers(currentArrayIndex: 3, capacity: 3);
 
             int capacity = reader.GetArrayCapacity(out int currentArrayIndex);
-            reader.EnsureArrayIndexes(capacity);
+            reader.EnsureArrayIndexes(currentArrayIndex);
 
             Assert.Equal(1, readCount);
             Assert.Equal(new IntPtr(IndexStart), readAddress);
             Assert.Equal(12, readLength);
             Assert.Equal(3, reader.Indexes.Count);
-            Assert.Equal(0, currentArrayIndex);
+            Assert.Equal(3, currentArrayIndex);
             Assert.Equal(0, reader.Indexes[0]);
             Assert.Equal(20, reader.Indexes[2]);
+        }
+
+        [Fact]
+        public void EnsureArrayIndexes_EmptyVectorDoesNotReadCapacityTail() {
+            int readCount = 0;
+            ChatLogReader reader = CreateReader(readBytes: (_, _) => readCount++);
+            reader.ChatLogPointers = CreatePointers(currentArrayIndex: 0, capacity: 1066);
+
+            reader.EnsureArrayIndexes(0);
+
+            Assert.Empty(reader.Indexes);
+            Assert.Equal(0, readCount);
         }
 
         [Fact]
@@ -120,22 +131,22 @@ namespace Sharlayan.Tests.Utilities {
         }
 
         [Fact]
-        public void GetChatLog_WrapImmediatelyAfterFirstPollUsesCurrentIndexAsCursor() {
-            byte[] tail = CreateEntry("Tail");
-            byte[] head = CreateEntry("Head");
+        public void GetChatLog_CountResetAfterFirstPollReprimesCurrentEnd() {
             int currentArrayIndex = 2;
+            int entryReadCount = 0;
             ChatLogReader chatLogReader = CreateReader(
                 readPointers: _ => CreatePointers(currentArrayIndex, capacity: 3),
                 readBytes: (address, destination) => {
                     if (address == new IntPtr(IndexStart)) {
-                        WriteInt32(destination, 0, head.Length);
-                        WriteInt32(destination, 1, 10);
-                        WriteInt32(destination, 2, 10 + tail.Length);
+                        WriteInt32(destination, 0, currentArrayIndex == 1 ? 7 : 10);
+                        if (currentArrayIndex == 2) {
+                            WriteInt32(destination, 1, 20);
+                        }
+
                         return;
                     }
 
-                    byte[] source = address == new IntPtr(LogStart + 10) ? tail : head;
-                    Buffer.BlockCopy(source, 0, destination, 0, source.Length);
+                    entryReadCount++;
                 });
             Reader reader = new Reader(chatLogReader);
 
@@ -145,54 +156,43 @@ namespace Sharlayan.Tests.Utilities {
 
             Assert.Empty(first.ChatLogItems);
             Assert.Equal(2, first.PreviousArrayIndex);
-            Assert.Collection(
-                second.ChatLogItems,
-                item => Assert.Equal("Tail", item.Message),
-                item => Assert.Equal("Head", item.Message));
+            Assert.Empty(second.ChatLogItems);
+            Assert.Equal(1, second.PreviousArrayIndex);
+            Assert.Equal(7, second.PreviousOffset);
+            Assert.Equal(0, entryReadCount);
         }
 
         [Fact]
-        public void GetChatLog_WrapReturnsTailBeforeHeadAndReadsIndexesOnce() {
-            byte[] tailOne = CreateEntry("Tail one");
-            byte[] tailTwo = CreateEntry("Tail two");
-            byte[] head = CreateEntry("Head");
-            int tailStart = 10;
-            int tailTwoStart = tailStart + tailOne.Length;
+        public void GetChatLog_CountResetDoesNotReadStaleCapacityTail() {
             int indexReadCount = 0;
-            Dictionary<long, byte[]> entries = new Dictionary<long, byte[]> {
-                [LogStart + tailStart] = tailOne,
-                [LogStart + tailTwoStart] = tailTwo,
-                [LogStart] = head,
-            };
+            int entryReadCount = 0;
+            Exception raisedException = null;
             ChatLogReader chatLogReader = CreateReader(
-                readPointers: _ => CreatePointers(currentArrayIndex: 1, capacity: 4),
+                readPointers: _ => CreatePointers(currentArrayIndex: 173, capacity: 1066),
                 readBytes: (address, destination) => {
                     if (address == new IntPtr(IndexStart)) {
                         indexReadCount++;
-                        WriteInt32(destination, 0, head.Length);
-                        WriteInt32(destination, 1, tailStart);
-                        WriteInt32(destination, 2, tailTwoStart);
-                        WriteInt32(destination, 3, tailTwoStart + tailTwo.Length);
+                        for (int i = 0; i < 173; i++) {
+                            WriteInt32(destination, i, (i + 1) * 10);
+                        }
+
                         return;
                     }
 
-                    byte[] source = entries[address.ToInt64()];
-                    Assert.Equal(source.Length, destination.Length);
-                    Buffer.BlockCopy(source, 0, destination, 0, source.Length);
-                });
+                    entryReadCount++;
+                },
+                raiseException: exception => raisedException = exception);
             chatLogReader.ChatLogFirstRun = false;
             Reader reader = new Reader(chatLogReader);
 
-            ChatLogResult result = reader.GetChatLog(2, tailStart);
+            ChatLogResult result = reader.GetChatLog(previousArrayIndex: 290, previousOffset: 19973);
 
-            Assert.Collection(
-                result.ChatLogItems,
-                item => Assert.Equal("Tail one", item.Message),
-                item => Assert.Equal("Tail two", item.Message),
-                item => Assert.Equal("Head", item.Message));
-            Assert.Equal(1, result.PreviousArrayIndex);
-            Assert.Equal(head.Length, result.PreviousOffset);
+            Assert.Empty(result.ChatLogItems);
+            Assert.Equal(173, result.PreviousArrayIndex);
+            Assert.Equal(1730, result.PreviousOffset);
             Assert.Equal(1, indexReadCount);
+            Assert.Equal(0, entryReadCount);
+            Assert.Null(raisedException);
         }
 
         [Theory]
@@ -283,8 +283,7 @@ namespace Sharlayan.Tests.Utilities {
         }
 
         [Fact]
-        public void GetChatLog_InvalidHeadAfterWrapDiscardsTailAndPreservesCursor() {
-            byte[] tail = CreateEntry("Tail");
+        public void GetChatLog_CountResetWithInvalidCurrentEndPreservesCursor() {
             Exception raisedException = null;
             ChatLogPointers pointers = CreatePointers(currentArrayIndex: 1, capacity: 3);
             pointers.LogNext = pointers.LogStart + 20;
@@ -293,12 +292,7 @@ namespace Sharlayan.Tests.Utilities {
                 readBytes: (address, destination) => {
                     if (address == new IntPtr(IndexStart)) {
                         WriteInt32(destination, 0, 21);
-                        WriteInt32(destination, 1, 10);
-                        WriteInt32(destination, 2, 10 + tail.Length);
-                        return;
                     }
-
-                    Buffer.BlockCopy(tail, 0, destination, 0, tail.Length);
                 },
                 raiseException: exception => raisedException = exception);
             chatLogReader.ChatLogFirstRun = false;
@@ -372,10 +366,11 @@ namespace Sharlayan.Tests.Utilities {
         }
 
         [Fact]
-        public void GetChatLog_CapacityGrowthPreservesCompatibleCursor() {
+        public void GetChatLog_CapacityGrowthReprimesWithoutReturningHistory() {
             byte[] entry = CreateEntry("After growth");
             int capacity = 2;
             int currentArrayIndex = 1;
+            int entryReadCount = 0;
             ChatLogReader chatLogReader = CreateReader(
                 readPointers: _ => CreatePointers(currentArrayIndex, capacity),
                 readBytes: (address, destination) => {
@@ -386,7 +381,7 @@ namespace Sharlayan.Tests.Utilities {
                         }
                     }
                     else {
-                        Buffer.BlockCopy(entry, 0, destination, 0, entry.Length);
+                        entryReadCount++;
                     }
                 });
             Reader reader = new Reader(chatLogReader);
@@ -397,9 +392,78 @@ namespace Sharlayan.Tests.Utilities {
             ChatLogResult second = reader.GetChatLog(first.PreviousArrayIndex, first.PreviousOffset);
 
             Assert.Empty(first.ChatLogItems);
-            Assert.Equal("After growth", second.ChatLogItems.Single().Message);
+            Assert.Empty(second.ChatLogItems);
             Assert.Equal(2, second.PreviousArrayIndex);
             Assert.Equal(10 + entry.Length, second.PreviousOffset);
+            Assert.Equal(0, entryReadCount);
+        }
+
+        [Fact]
+        public void GetChatLog_IndexSnapshotChangeRetriesBeforeCommittingCursor() {
+            int pointerReadCount = 0;
+            int indexReadCount = 0;
+            ChatLogReader chatLogReader = CreateReader(
+                readPointers: _ => {
+                    pointerReadCount++;
+                    return CreatePointers(currentArrayIndex: pointerReadCount == 1 ? 1 : 2, capacity: 3);
+                },
+                readBytes: (address, destination) => {
+                    Assert.Equal(new IntPtr(IndexStart), address);
+                    indexReadCount++;
+                    WriteInt32(destination, 0, 10);
+                    if (destination.Length >= 2 * sizeof(int)) {
+                        WriteInt32(destination, 1, 20);
+                    }
+                });
+            Reader reader = new Reader(chatLogReader);
+
+            ChatLogResult result = reader.GetChatLog();
+
+            Assert.Empty(result.ChatLogItems);
+            Assert.Equal(2, result.PreviousArrayIndex);
+            Assert.Equal(20, result.PreviousOffset);
+            Assert.Equal(5, pointerReadCount);
+            Assert.Equal(2, indexReadCount);
+        }
+
+        [Fact]
+        public void GetChatLog_DataSnapshotChangeRetriesWithoutReturningDuplicateEntries() {
+            byte[] firstEntry = CreateEntry("First");
+            byte[] secondEntry = CreateEntry("Second");
+            int pointerReadCount = 0;
+            int entryReadCount = 0;
+            ChatLogReader chatLogReader = CreateReader(
+                readPointers: _ => {
+                    pointerReadCount++;
+                    return CreatePointers(currentArrayIndex: pointerReadCount <= 2 ? 1 : 2, capacity: 3);
+                },
+                readBytes: (address, destination) => {
+                    if (address == new IntPtr(IndexStart)) {
+                        WriteInt32(destination, 0, firstEntry.Length);
+                        if (destination.Length >= 2 * sizeof(int)) {
+                            WriteInt32(destination, 1, firstEntry.Length + secondEntry.Length);
+                        }
+
+                        return;
+                    }
+
+                    entryReadCount++;
+                    byte[] source = address == new IntPtr(LogStart) ? firstEntry : secondEntry;
+                    Buffer.BlockCopy(source, 0, destination, 0, source.Length);
+                });
+            chatLogReader.ChatLogFirstRun = false;
+            Reader reader = new Reader(chatLogReader);
+
+            ChatLogResult result = reader.GetChatLog();
+
+            Assert.Collection(
+                result.ChatLogItems,
+                item => Assert.Equal("First", item.Message),
+                item => Assert.Equal("Second", item.Message));
+            Assert.Equal(2, result.PreviousArrayIndex);
+            Assert.Equal(firstEntry.Length + secondEntry.Length, result.PreviousOffset);
+            Assert.Equal(6, pointerReadCount);
+            Assert.Equal(3, entryReadCount);
         }
 
         [Fact]

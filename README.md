@@ -12,9 +12,9 @@ Supported targets: .NET Framework 4.6.2 and 4.8, plus .NET 6, 7, 8, and 10.
 
 # How do I use it and what comes back?
 
-- .NET CLI: `dotnet add package Sharlayan.Lite --version 9.1.3`
-- Nuget Package Manager: `Install-Package Sharlayan.Lite -Version 9.1.3`
-- PackageReference: `<PackageReference Include="Sharlayan.Lite" Version="9.1.3" />`
+- .NET CLI: `dotnet add package Sharlayan.Lite --version 9.1.4`
+- Nuget Package Manager: `Install-Package Sharlayan.Lite -Version 9.1.4`
+- PackageReference: `<PackageReference Include="Sharlayan.Lite" Version="9.1.4" />`
 
 That's the basic of it. For actual instantiation it works as follows:
 

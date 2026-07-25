@@ -13,10 +13,10 @@ This file applies to the whole Sharlayan.Lite repository.
 
 ## Supported package baseline
 
-- Prepared source package version: `9.1.3`.
-- Latest published package version: `9.1.2`.
+- Current source package version: `9.1.4`.
+- Latest published package version: `9.1.3`.
 - Target frameworks: `net462;net48;net6.0;net7.0;net8.0;net10.0`.
-- File version: `9.1.3.0`.
+- File version: `9.1.4.0`.
 - Assembly version remains `8.0.0.0` for binary compatibility.
 - Current embedded Hermes revision:
   `sha256:419248bf2ef93aa64e72723ea9e97d5503163178dab63e90a8155b359ebcf96d`.
@@ -84,7 +84,14 @@ carry this waiver into another release.
   a fresh cache and build a consumer project.
 - Package 9.1.2 was published by Actions run
   `https://github.com/sappho192/Sharlayan.Lite/actions/runs/30161079520`.
-- The package currently lacks an embedded README; address this before a future package if practical.
+- Package 9.1.3 was accepted and indexed by NuGet from Actions run
+  `https://github.com/sappho192/Sharlayan.Lite/actions/runs/30165039063`, but that run concluded as
+  failed after publication. `dotnet nuget push` automatically pushed the sibling `.snupkg` with the
+  `.nupkg`, and the workflow then pushed the same `.snupkg` explicitly and received HTTP 409. Never
+  rerun 9.1.3 or use `--skip-duplicate`: it is already immutable and public. Before the next release,
+  add `--no-symbols` to the `.nupkg` push if the explicit `.snupkg` push is retained, or remove the
+  second push so the symbol package is submitted exactly once.
+- Package 9.1.3 includes an embedded README.
 - Do not copy Environment input identifiers, reviewer identities, local user paths, process IDs,
   player names, user-generated chat, NPC names, or raw NPC dialogue into public documentation.
   Exact Talk strings may be viewed transiently in a local agent diagnostic session, but retain only
@@ -101,3 +108,5 @@ gh api repos/sappho192/Sharlayan.Lite/environments/production/deployment-branch-
 Read `docs/2026-07-25/2026-07-25-hermes-v2-and-nuget-release.md` before the next release.
 For the 9.1.3 package-contract fix, also read
 `docs/2026-07-26/2026-07-26-sharlayan-9.1.3-release-preparation.md`.
+For the 9.1.4 CHATLOG reset fix and release evidence, read
+`docs/2026-07-26/2026-07-26-sharlayan-9.1.4-chatlog-reset-release.md`.
