@@ -13,9 +13,10 @@ This file applies to the whole Sharlayan.Lite repository.
 
 ## Supported package baseline
 
-- Current package version: `9.1.2`.
+- Prepared source package version: `9.1.3`.
+- Latest published package version: `9.1.2`.
 - Target frameworks: `net462;net48;net6.0;net7.0;net8.0;net10.0`.
-- File version: `9.1.2.0`.
+- File version: `9.1.3.0`.
 - Assembly version remains `8.0.0.0` for binary compatibility.
 - Current embedded Hermes revision:
   `sha256:419248bf2ef93aa64e72723ea9e97d5503163178dab63e90a8155b359ebcf96d`.
@@ -56,7 +57,8 @@ dotnet restore Sharlayan.sln
 dotnet build Sharlayan.sln --configuration Release --no-restore --nologo
 dotnet test Sharlayan.Tests/Sharlayan.Tests.csproj --configuration Release --no-build --no-restore --nologo
 dotnet pack Sharlayan/Sharlayan.csproj --configuration Release --no-build --no-restore --nologo --output artifacts/packages -p:PackageVersion=<version>
-.\tools\Verify-Package.ps1 -PackageDirectory .\artifacts\packages -ExpectedPackageVersion <version>
+.\tools\Verify-Package.ps1 -PackageDirectory .\artifacts\packages -ExpectedPackageVersion <version> -ExpectedRepositoryCommit <final-verifier-sha>
+.\tools\Verify-PackageConsumer.ps1 -PackageDirectory .\artifacts\packages -ExpectedPackageVersion <version>
 ```
 
 Live smoke is manual because it requires an interactive game session and a GPU-capable Windows
@@ -97,3 +99,5 @@ gh api repos/sappho192/Sharlayan.Lite/environments/production/deployment-branch-
 ```
 
 Read `docs/2026-07-25/2026-07-25-hermes-v2-and-nuget-release.md` before the next release.
+For the 9.1.3 package-contract fix, also read
+`docs/2026-07-26/2026-07-26-sharlayan-9.1.3-release-preparation.md`.

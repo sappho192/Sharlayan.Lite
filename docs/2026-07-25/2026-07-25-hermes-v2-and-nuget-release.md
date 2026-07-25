@@ -256,7 +256,8 @@ version 전에 embedded package README 추가를 검토한다.
 
 1. version과 changelog를 정렬한다.
 2. generated chat resource를 다시 만들고 Git diff가 없는지 확인한다.
-3. multi-target build, net8/net10 test, pack 및 `Verify-Package.ps1`을 실행한다.
+3. multi-target build, net8/net10 test, pack, final repository commit 검증 및
+   `Verify-PackageConsumer.ps1` clean-cache consumer build를 실행한다.
 4. 필요한 실제 게임 live smoke를 수행하고 미충족 항목을 그대로 기록한다.
 5. 같은 version이 NuGet.org에 없는지 확인한다. NuGet version은 덮어쓸 수 없다.
 6. `release.yml`을 `publish=false`로 실행한다.
@@ -280,6 +281,7 @@ gh ... --repo sappho192/Sharlayan.Lite
 - `docs/2026-07-22/2026-07-22-05-live-smoke.md`
 - `docs/2026-07-22/2026-07-22-06-hermes-v2-runtime-plan.md`
 - `docs/2026-07-22/2026-07-22-07-hermes-v2-handoff.md`
+- `docs/2026-07-26/2026-07-26-sharlayan-9.1.3-release-preparation.md`
 - `sappho192/ffxiv-hermes`의
   `docs/2026-07-25/2026-07-25-v2-release-session.md`
 - Microsoft Learn:

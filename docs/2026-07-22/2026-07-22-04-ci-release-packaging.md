@@ -27,10 +27,17 @@ CI와 수동 release가 동일한 generate, build, test, pack, verify 순서를 
 - package 디렉터리에 ID와 version이 일치하는 `.nupkg`와 `.snupkg`가 각각 하나 있음
 - `net462`, `net48`, `net6.0`, `net7.0`, `net8.0`, `net10.0`용 `Sharlayan.dll` 포함
 - 6개 target framework용 symbol PDB 포함
-- `THIRD-PARTY-NOTICES.md`와 `Logo.png` 포함
+- `THIRD-PARTY-NOTICES.md`, package `README.md`와 `Logo.png` 포함
+- repository commit metadata와 final verifier SHA 일치
+- net10.0 DLL의 current-first Talk public API 계약 확인
 - 의도하지 않은 runtime assembly 부재
 - FCS, InteropGenerator, Lumina, System.Net.Http runtime dependency 부재
-- main/symbol 합산 600,000바이트 이하
+- main/symbol 합산 650,000바이트 이하
+
+그 뒤 `Verify-PackageConsumer.ps1`은 새 consumer directory와 빈 global package cache를 만들고
+로컬 nupkg를 정확한 version으로 restore한다. Consumer는 current-first Talk API를 직접
+compile하고 reflection으로 다시 확인하며, cache에 복사된 nupkg의 SHA-256이 입력 artifact와
+일치하는지 검증한다. ProjectReference나 임의 DLL 복사는 사용하지 않는다.
 
 첫 표준 pack 결과의 main package 크기는 236,061바이트다. `8.1.0-beta.1` 검증 산출물의 main/symbol 합산 크기는 324,646바이트다. PDB와 source symbol은 별도 `.snupkg`로 분리되므로 기존 symbols package rename script는 사용하지 않는다.
 
@@ -42,7 +49,8 @@ CI와 수동 release가 동일한 generate, build, test, pack, verify 순서를 
 dotnet build Sharlayan.sln --configuration Release -p:GeneratePackageOnBuild=false
 dotnet test Sharlayan.Tests/Sharlayan.Tests.csproj --configuration Release --no-build
 dotnet pack Sharlayan/Sharlayan.csproj --configuration Release --no-build --output artifacts/packages
-./tools/Verify-Package.ps1 -PackageDirectory artifacts/packages
+./tools/Verify-Package.ps1 -PackageDirectory artifacts/packages -ExpectedPackageVersion <version> -ExpectedRepositoryCommit <final-verifier-sha>
+./tools/Verify-PackageConsumer.ps1 -PackageDirectory artifacts/packages -ExpectedPackageVersion <version>
 ```
 
 ## 수동 Release

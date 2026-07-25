@@ -7,7 +7,11 @@ param(
 
     [string] $ExpectedPackageVersion,
 
-    [long] $MaximumBytes = 600000
+    [string] $ExpectedRepositoryCommit,
+
+    [string] $ExpectedRepositoryUrl = 'https://github.com/sappho192/Sharlayan.Lite',
+
+    [long] $MaximumBytes = 650000
 )
 
 $ErrorActionPreference = 'Stop'
@@ -38,11 +42,76 @@ function Get-PackageMetadata {
 
     $dependencyIds = @($nuspec.SelectNodes("//*[local-name()='dependency']") | ForEach-Object { $_.GetAttribute('id') })
     $packageTypes = @($nuspec.SelectNodes("//*[local-name()='packageType']") | ForEach-Object { $_.GetAttribute('name') })
+    $readmeNode = $nuspec.SelectSingleNode("/*[local-name()='package']/*[local-name()='metadata']/*[local-name()='readme']")
+    $repositoryNode = $nuspec.SelectSingleNode("/*[local-name()='package']/*[local-name()='metadata']/*[local-name()='repository']")
     return [pscustomobject]@{
         Id = $idNode.InnerText
         Version = $versionNode.InnerText
         DependencyIds = $dependencyIds
         PackageTypes = $packageTypes
+        Readme = if ($null -eq $readmeNode) { $null } else { $readmeNode.InnerText }
+        RepositoryType = if ($null -eq $repositoryNode) { $null } else { $repositoryNode.GetAttribute('type') }
+        RepositoryUrl = if ($null -eq $repositoryNode) { $null } else { $repositoryNode.GetAttribute('url') }
+        RepositoryCommit = if ($null -eq $repositoryNode) { $null } else { $repositoryNode.GetAttribute('commit') }
+    }
+}
+
+function Assert-PublicPackageContract {
+    param($Archive)
+
+    $assemblyEntry = $Archive.GetEntry('lib/net10.0/Sharlayan.dll')
+    if ($null -eq $assemblyEntry) {
+        throw 'Package does not contain the net10.0 Sharlayan assembly.'
+    }
+
+    $assemblyStream = $assemblyEntry.Open()
+    $assemblyBuffer = [System.IO.MemoryStream]::new()
+    try {
+        $assemblyStream.CopyTo($assemblyBuffer)
+        $assembly = [System.Reflection.Assembly]::Load($assemblyBuffer.ToArray())
+    }
+    finally {
+        $assemblyBuffer.Dispose()
+        $assemblyStream.Dispose()
+    }
+
+    $readerType = $assembly.GetType('Sharlayan.Reader', $true)
+    $talkResultType = $assembly.GetType('Sharlayan.Models.ReadResults.TalkResult', $true)
+    $talkSourceType = $assembly.GetType('Sharlayan.Models.ReadResults.TalkSource', $true)
+    $methodContracts = @{
+        CanGetTalk = [bool]
+        GetTalk = $talkResultType
+        GetCurrentTalk = $talkResultType
+        GetLastTalk = $talkResultType
+    }
+    foreach ($contract in $methodContracts.GetEnumerator()) {
+        $method = $readerType.GetMethod(
+            $contract.Key,
+            [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::Public)
+        if ($null -eq $method -or
+            $method.GetParameters().Length -ne 0 -or
+            $method.ReturnType -ne $contract.Value) {
+            throw "Package public contract is missing Reader.$($contract.Key)()."
+        }
+    }
+
+    $propertyContracts = @{
+        Source = $talkSourceType
+        IsVisible = [bool]
+        IsAvailable = [bool]
+        Name = [string]
+        Text = [string]
+    }
+    foreach ($contract in $propertyContracts.GetEnumerator()) {
+        $property = $talkResultType.GetProperty(
+            $contract.Key,
+            [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::Public)
+        if ($null -eq $property -or
+            $null -eq $property.GetMethod -or
+            -not $property.GetMethod.IsPublic -or
+            $property.PropertyType -ne $contract.Value) {
+            throw "Package public contract is missing TalkResult.$($contract.Key)."
+        }
     }
 }
 
@@ -74,6 +143,22 @@ try {
         throw "Expected package version '$ExpectedPackageVersion', found '$($metadata.Version)'."
     }
 
+    if ($metadata.Readme -cne 'README.md') {
+        throw "Package metadata must declare README.md as the package readme."
+    }
+
+    if ($metadata.RepositoryType -cne 'git' -or $metadata.RepositoryUrl -cne $ExpectedRepositoryUrl) {
+        throw "Package repository metadata does not identify '$ExpectedRepositoryUrl' as a git repository."
+    }
+
+    if ($metadata.RepositoryCommit -cnotmatch '^[0-9a-f]{40}$') {
+        throw "Package repository commit is missing or invalid."
+    }
+
+    if ($ExpectedRepositoryCommit -and $metadata.RepositoryCommit -cne $ExpectedRepositoryCommit) {
+        throw "Expected repository commit '$ExpectedRepositoryCommit', found '$($metadata.RepositoryCommit)'."
+    }
+
     $expectedPackageName = "$($metadata.Id).$($metadata.Version).nupkg"
     if ($package.Name -cne $expectedPackageName) {
         throw "Expected package file '$expectedPackageName', found '$($package.Name)'."
@@ -88,6 +173,7 @@ try {
         'lib/net8.0/Sharlayan.dll',
         'lib/net10.0/Sharlayan.dll',
         'THIRD-PARTY-NOTICES.md',
+        'README.md',
         'Logo.png'
     )
 
@@ -109,11 +195,14 @@ try {
             throw "Package declares forbidden runtime dependency '$dependency'."
         }
     }
+
+    Assert-PublicPackageContract $archive
 }
 finally {
     $archive.Dispose()
 }
 
+$packageSha256 = (Get-FileHash -LiteralPath $package.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
 $expectedSymbolName = "$($metadata.Id).$($metadata.Version).snupkg"
 if ($symbolPackage.Name -cne $expectedSymbolName) {
     throw "Expected symbol package file '$expectedSymbolName', found '$($symbolPackage.Name)'."
@@ -124,6 +213,10 @@ try {
     $symbolMetadata = Get-PackageMetadata $symbolArchive
     if ($symbolMetadata.Id -cne $metadata.Id -or $symbolMetadata.Version -cne $metadata.Version) {
         throw 'Symbol package ID or version does not match the main package.'
+    }
+
+    if ($symbolMetadata.RepositoryCommit -cne $metadata.RepositoryCommit) {
+        throw 'Symbol package repository commit does not match the main package.'
     }
 
     if ($symbolMetadata.PackageTypes -inotcontains 'SymbolsPackage') {
@@ -189,3 +282,5 @@ finally {
 }
 
 Write-Output "Verified $($package.Name) and $($symbolPackage.Name) ($totalSize bytes combined)."
+Write-Output "Repository commit: $($metadata.RepositoryCommit)"
+Write-Output "Package SHA-256: $packageSha256"
