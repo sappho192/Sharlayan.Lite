@@ -14,7 +14,7 @@ This file applies to the whole Sharlayan.Lite repository.
 ## Supported package baseline
 
 - Current source package version: `9.1.4`.
-- Latest published package version: `9.1.3`.
+- Latest published package version: `9.1.4`.
 - Target frameworks: `net462;net48;net6.0;net7.0;net8.0;net10.0`.
 - File version: `9.1.4.0`.
 - Assembly version remains `8.0.0.0` for binary compatibility.
@@ -70,6 +70,12 @@ could test it. The approximately 420-second run was not a 10-minute PASS, and 1,
 explicit channel fixtures, elevated attach, and upstream comparison remained incomplete. Do not
 carry this waiver into another release.
 
+The 9.1.4 release used a separate, version-scoped user decision after 420.1 seconds, 2,723 entries,
+and 3 observed cursor wraps passed without `Invalid chat entry size`, `OnException`, or stderr.
+This exceeded the prior failure point and the 1,000-entry/wrap threshold, but it was not a 10-minute
+PASS. Explicit user-action channel fixtures, elevated attach, and upstream comparison also remain
+incomplete. Do not carry the 9.1.4 decision into another release.
+
 ## NuGet release
 
 - Workflow: `.github/workflows/release.yml`.
@@ -88,10 +94,11 @@ carry this waiver into another release.
   `https://github.com/sappho192/Sharlayan.Lite/actions/runs/30165039063`, but that run concluded as
   failed after publication. `dotnet nuget push` automatically pushed the sibling `.snupkg` with the
   `.nupkg`, and the workflow then pushed the same `.snupkg` explicitly and received HTTP 409. Never
-  rerun 9.1.3 or use `--skip-duplicate`: it is already immutable and public. Before the next release,
-  add `--no-symbols` to the `.nupkg` push if the explicit `.snupkg` push is retained, or remove the
-  second push so the symbol package is submitted exactly once.
-- Package 9.1.3 includes an embedded README.
+  rerun 9.1.3 or use `--skip-duplicate`: it is already immutable and public.
+- Package 9.1.4 was published successfully by Actions run
+  `https://github.com/sappho192/Sharlayan.Lite/actions/runs/30166550163`. Its `.nupkg` push uses
+  `--no-symbols`, and the verified `.snupkg` is submitted separately exactly once.
+- Packages from 9.1.3 onward include an embedded README.
 - Do not copy Environment input identifiers, reviewer identities, local user paths, process IDs,
   player names, user-generated chat, NPC names, or raw NPC dialogue into public documentation.
   Exact Talk strings may be viewed transiently in a local agent diagnostic session, but retain only
