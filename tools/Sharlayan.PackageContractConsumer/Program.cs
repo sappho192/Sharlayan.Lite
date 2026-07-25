@@ -7,16 +7,18 @@ using Sharlayan.Models.ReadResults;
 
 internal static class Program {
     public static int Main(string[] args) {
-        string expectedVersion = args.Length == 1
+        string expectedVersion = args.Length == 2
             ? args[0]
-            : throw new ArgumentException("Expected the package version as the only argument.");
+            : throw new ArgumentException("Expected package version and repository commit arguments.");
+        string expectedCommit = args[1];
         string informationalVersion =
             typeof(Reader).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion
             ?? throw new InvalidOperationException("Sharlayan assembly has no informational version.");
         string actualVersion = informationalVersion.Split('+')[0];
-        if (!string.Equals(actualVersion, expectedVersion, StringComparison.Ordinal)) {
+        string expectedInformationalVersion = $"{expectedVersion}+{expectedCommit}";
+        if (!string.Equals(informationalVersion, expectedInformationalVersion, StringComparison.Ordinal)) {
             throw new InvalidOperationException(
-                $"Expected Sharlayan assembly version {expectedVersion}, found {actualVersion}.");
+                $"Expected Sharlayan assembly informational version {expectedInformationalVersion}, found {informationalVersion}.");
         }
 
         AssertPublicMethod(nameof(Reader.CanGetTalk), typeof(bool));

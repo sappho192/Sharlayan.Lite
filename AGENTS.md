@@ -58,7 +58,7 @@ dotnet build Sharlayan.sln --configuration Release --no-restore --nologo
 dotnet test Sharlayan.Tests/Sharlayan.Tests.csproj --configuration Release --no-build --no-restore --nologo
 dotnet pack Sharlayan/Sharlayan.csproj --configuration Release --no-build --no-restore --nologo --output artifacts/packages -p:PackageVersion=<version>
 .\tools\Verify-Package.ps1 -PackageDirectory .\artifacts\packages -ExpectedPackageVersion <version> -ExpectedRepositoryCommit <final-verifier-sha>
-.\tools\Verify-PackageConsumer.ps1 -PackageDirectory .\artifacts\packages -ExpectedPackageVersion <version>
+.\tools\Verify-PackageConsumer.ps1 -PackageDirectory .\artifacts\packages -ExpectedPackageVersion <version> -ExpectedRepositoryCommit <final-verifier-sha>
 ```
 
 Live smoke is manual because it requires an interactive game session and a GPU-capable Windows

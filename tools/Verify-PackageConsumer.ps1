@@ -4,7 +4,10 @@ param(
     [string] $PackageDirectory,
 
     [Parameter(Mandatory = $true)]
-    [string] $ExpectedPackageVersion
+    [string] $ExpectedPackageVersion,
+
+    [Parameter(Mandatory = $true)]
+    [string] $ExpectedRepositoryCommit
 )
 
 $ErrorActionPreference = 'Stop'
@@ -70,7 +73,7 @@ try {
         --configuration Release `
         --no-build `
         --no-restore `
-        -- $ExpectedPackageVersion
+        -- $ExpectedPackageVersion $ExpectedRepositoryCommit
     if ($LASTEXITCODE -ne 0) {
         throw "Clean consumer contract execution failed with exit code $LASTEXITCODE."
     }

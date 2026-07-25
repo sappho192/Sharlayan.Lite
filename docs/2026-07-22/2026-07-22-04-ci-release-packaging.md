@@ -50,7 +50,7 @@ dotnet build Sharlayan.sln --configuration Release -p:GeneratePackageOnBuild=fal
 dotnet test Sharlayan.Tests/Sharlayan.Tests.csproj --configuration Release --no-build
 dotnet pack Sharlayan/Sharlayan.csproj --configuration Release --no-build --output artifacts/packages
 ./tools/Verify-Package.ps1 -PackageDirectory artifacts/packages -ExpectedPackageVersion <version> -ExpectedRepositoryCommit <final-verifier-sha>
-./tools/Verify-PackageConsumer.ps1 -PackageDirectory artifacts/packages -ExpectedPackageVersion <version>
+./tools/Verify-PackageConsumer.ps1 -PackageDirectory artifacts/packages -ExpectedPackageVersion <version> -ExpectedRepositoryCommit <final-verifier-sha>
 ```
 
 ## 수동 Release

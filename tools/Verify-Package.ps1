@@ -57,7 +57,11 @@ function Get-PackageMetadata {
 }
 
 function Assert-PublicPackageContract {
-    param($Archive)
+    param(
+        $Archive,
+        [string] $ExpectedVersion,
+        [string] $ExpectedCommit
+    )
 
     $assemblyEntry = $Archive.GetEntry('lib/net10.0/Sharlayan.dll')
     if ($null -eq $assemblyEntry) {
@@ -78,6 +82,19 @@ function Assert-PublicPackageContract {
     $readerType = $assembly.GetType('Sharlayan.Reader', $true)
     $talkResultType = $assembly.GetType('Sharlayan.Models.ReadResults.TalkResult', $true)
     $talkSourceType = $assembly.GetType('Sharlayan.Models.ReadResults.TalkSource', $true)
+    $informationalVersion = @(
+        $assembly.GetCustomAttributes([System.Reflection.AssemblyInformationalVersionAttribute], $false)
+    )[0].InformationalVersion
+    $fileVersion = @(
+        $assembly.GetCustomAttributes([System.Reflection.AssemblyFileVersionAttribute], $false)
+    )[0].Version
+    if ($ExpectedVersion -and $informationalVersion -cne "$ExpectedVersion+$ExpectedCommit") {
+        throw "Package assembly informational version '$informationalVersion' does not match '$ExpectedVersion+$ExpectedCommit'."
+    }
+    if ($ExpectedVersion -and $fileVersion -cne "$ExpectedVersion.0") {
+        throw "Package assembly file version '$fileVersion' does not match '$ExpectedVersion.0'."
+    }
+
     $methodContracts = @{
         CanGetTalk = [bool]
         GetTalk = $talkResultType
@@ -196,7 +213,7 @@ try {
         }
     }
 
-    Assert-PublicPackageContract $archive
+    Assert-PublicPackageContract $archive $ExpectedPackageVersion $metadata.RepositoryCommit
 }
 finally {
     $archive.Dispose()
