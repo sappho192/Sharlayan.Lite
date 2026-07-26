@@ -111,7 +111,7 @@ namespace Sharlayan.Resources {
             RequireBoolean(framework, "isPointer", "$.roots.framework.");
 
             JObject resources = RequireObject(root, "resources", "$.");
-            ValidateObject(resources, "$.resources", "chatLog", "talk", "currentTalk");
+            ValidateObject(resources, "$.resources", "chatLog", "talk", "currentTalk", "battleTalk");
             JObject chatLog = RequireObject(resources, "chatLog", "$.resources.");
             ValidateObject(chatLog, "$.resources.chatLog", "root", "uiModuleOffset", "raptureLogModuleOffset", "indexVectorOffset", "dataVectorOffset");
             RequireString(chatLog, "root", "$.resources.chatLog.");
@@ -197,6 +197,85 @@ namespace Sharlayan.Resources {
                 if (value.Type != JTokenType.Integer) {
                     throw new InvalidDataException("$.resources.currentTalk.atkValue.allowedStringTypes must contain integers.");
                 }
+            }
+
+            if (resources["battleTalk"] != null) {
+                JObject battleTalk = RequireObject(resources, "battleTalk", "$.resources.");
+                ValidateObject(
+                    battleTalk,
+                    "$.resources.battleTalk",
+                    "root",
+                    "semantics",
+                    "uiModuleOffset",
+                    "raptureAtkModuleOffset",
+                    "raptureAtkUnitManagerOffset",
+                    "allLoadedUnitsListOffset",
+                    "atkUnitList",
+                    "addon",
+                    "addonName",
+                    "atkArrayDataHolderOffset",
+                    "arrayDataHolder",
+                    "arrayData",
+                    "numberValuesOffset",
+                    "stringValuesOffset",
+                    "numberArrayId",
+                    "stringArrayId",
+                    "visibleIndex",
+                    "nameIndex",
+                    "textIndex",
+                    "sequenceSemantics");
+                RequireString(battleTalk, "root", "$.resources.battleTalk.");
+                RequireString(battleTalk, "semantics", "$.resources.battleTalk.");
+                RequireInteger(battleTalk, "uiModuleOffset", "$.resources.battleTalk.");
+                RequireInteger(battleTalk, "raptureAtkModuleOffset", "$.resources.battleTalk.");
+                RequireInteger(battleTalk, "raptureAtkUnitManagerOffset", "$.resources.battleTalk.");
+                RequireInteger(battleTalk, "allLoadedUnitsListOffset", "$.resources.battleTalk.");
+                RequireString(battleTalk, "addonName", "$.resources.battleTalk.");
+                RequireInteger(battleTalk, "atkArrayDataHolderOffset", "$.resources.battleTalk.");
+                RequireInteger(battleTalk, "numberValuesOffset", "$.resources.battleTalk.");
+                RequireInteger(battleTalk, "stringValuesOffset", "$.resources.battleTalk.");
+                RequireInteger(battleTalk, "numberArrayId", "$.resources.battleTalk.");
+                RequireInteger(battleTalk, "stringArrayId", "$.resources.battleTalk.");
+                RequireInteger(battleTalk, "visibleIndex", "$.resources.battleTalk.");
+                RequireInteger(battleTalk, "nameIndex", "$.resources.battleTalk.");
+                RequireInteger(battleTalk, "textIndex", "$.resources.battleTalk.");
+                RequireString(battleTalk, "sequenceSemantics", "$.resources.battleTalk.");
+
+                JObject battleList = RequireObject(battleTalk, "atkUnitList", "$.resources.battleTalk.");
+                ValidateObject(battleList, "$.resources.battleTalk.atkUnitList", "entriesOffset", "countOffset", "capacity", "entrySize");
+                RequireInteger(battleList, "entriesOffset", "$.resources.battleTalk.atkUnitList.");
+                RequireInteger(battleList, "countOffset", "$.resources.battleTalk.atkUnitList.");
+                RequireInteger(battleList, "capacity", "$.resources.battleTalk.atkUnitList.");
+                RequireInteger(battleList, "entrySize", "$.resources.battleTalk.atkUnitList.");
+
+                JObject battleAddon = RequireObject(battleTalk, "addon", "$.resources.battleTalk.");
+                ValidateObject(
+                    battleAddon,
+                    "$.resources.battleTalk.addon",
+                    "nameOffset",
+                    "nameCapacity",
+                    "visibilityStateOffset",
+                    "visibilityMask",
+                    "readinessOffset",
+                    "readinessMask");
+                RequireInteger(battleAddon, "nameOffset", "$.resources.battleTalk.addon.");
+                RequireInteger(battleAddon, "nameCapacity", "$.resources.battleTalk.addon.");
+                RequireInteger(battleAddon, "visibilityStateOffset", "$.resources.battleTalk.addon.");
+                RequireInteger(battleAddon, "visibilityMask", "$.resources.battleTalk.addon.");
+                RequireInteger(battleAddon, "readinessOffset", "$.resources.battleTalk.addon.");
+                RequireInteger(battleAddon, "readinessMask", "$.resources.battleTalk.addon.");
+
+                JObject holder = RequireObject(battleTalk, "arrayDataHolder", "$.resources.battleTalk.");
+                ValidateObject(holder, "$.resources.battleTalk.arrayDataHolder", "numberArrayCountOffset", "numberArraysOffset", "stringArrayCountOffset", "stringArraysOffset");
+                RequireInteger(holder, "numberArrayCountOffset", "$.resources.battleTalk.arrayDataHolder.");
+                RequireInteger(holder, "numberArraysOffset", "$.resources.battleTalk.arrayDataHolder.");
+                RequireInteger(holder, "stringArrayCountOffset", "$.resources.battleTalk.arrayDataHolder.");
+                RequireInteger(holder, "stringArraysOffset", "$.resources.battleTalk.arrayDataHolder.");
+
+                JObject arrayData = RequireObject(battleTalk, "arrayData", "$.resources.battleTalk.");
+                ValidateObject(arrayData, "$.resources.battleTalk.arrayData", "sizeOffset", "updateStateOffset");
+                RequireInteger(arrayData, "sizeOffset", "$.resources.battleTalk.arrayData.");
+                RequireInteger(arrayData, "updateStateOffset", "$.resources.battleTalk.arrayData.");
             }
 
             JObject validation = RequireObject(root, "validation", "$.");
@@ -398,6 +477,61 @@ namespace Sharlayan.Resources {
                 || currentTalk.TextValueIndex != 0
                 || currentTalk.NameValueIndex != 1) {
                 throw new InvalidDataException("CurrentTalk AtkValue semantics are invalid.");
+            }
+
+            HermesBattleTalkResource battleTalk = manifest.Resources.BattleTalk;
+            if (battleTalk != null) {
+                if (manifest.Compatibility.MinimumSharlayanVersion != "9.2.0"
+                    || battleTalk.Root != "framework"
+                    || battleTalk.Semantics != "currentBattleTalk"
+                    || battleTalk.AddonName != "_BattleTalk"
+                    || battleTalk.SequenceSemantics != "visibilityOrContentGeneration"
+                    || battleTalk.UiModuleOffset != currentTalk.UiModuleOffset
+                    || battleTalk.RaptureAtkModuleOffset != currentTalk.RaptureAtkModuleOffset
+                    || battleTalk.RaptureAtkUnitManagerOffset != currentTalk.RaptureAtkUnitManagerOffset
+                    || battleTalk.AllLoadedUnitsListOffset != currentTalk.AllLoadedUnitsListOffset
+                    || battleTalk.NumberArrayId != 38
+                    || battleTalk.StringArrayId != 35
+                    || battleTalk.VisibleIndex != 0
+                    || battleTalk.NameIndex != 0
+                    || battleTalk.TextIndex != 1) {
+                    throw new InvalidDataException("BattleTalk resource semantics are invalid.");
+                }
+
+                HermesAtkUnitListLayout battleList =
+                    battleTalk.AtkUnitList ?? throw new InvalidDataException("BattleTalk AtkUnitList layout is missing.");
+                HermesAddonVisibilityLayout battleAddon =
+                    battleTalk.Addon ?? throw new InvalidDataException("BattleTalk addon layout is missing.");
+                HermesAtkArrayDataHolderLayout holder =
+                    battleTalk.ArrayDataHolder ?? throw new InvalidDataException("BattleTalk array holder layout is missing.");
+                HermesAtkArrayDataLayout arrayData =
+                    battleTalk.ArrayData ?? throw new InvalidDataException("BattleTalk array data layout is missing.");
+                ValidateOffset(battleTalk.AtkArrayDataHolderOffset, nameof(battleTalk.AtkArrayDataHolderOffset));
+                ValidateOffset(holder.NumberArrayCountOffset, nameof(holder.NumberArrayCountOffset));
+                ValidateOffset(holder.NumberArraysOffset, nameof(holder.NumberArraysOffset));
+                ValidateOffset(holder.StringArrayCountOffset, nameof(holder.StringArrayCountOffset));
+                ValidateOffset(holder.StringArraysOffset, nameof(holder.StringArraysOffset));
+                ValidateOffset(arrayData.SizeOffset, nameof(arrayData.SizeOffset));
+                ValidateOffset(arrayData.UpdateStateOffset, nameof(arrayData.UpdateStateOffset));
+                ValidateOffset(battleTalk.NumberValuesOffset, nameof(battleTalk.NumberValuesOffset));
+                ValidateOffset(battleTalk.StringValuesOffset, nameof(battleTalk.StringValuesOffset));
+                if (battleList.EntriesOffset != unitList.EntriesOffset
+                    || battleList.CountOffset != unitList.CountOffset
+                    || battleList.Capacity != unitList.Capacity
+                    || battleList.EntrySize != unitList.EntrySize
+                    || battleAddon.NameOffset != addon.NameOffset
+                    || battleAddon.NameCapacity != addon.NameCapacity
+                    || battleAddon.VisibilityStateOffset != addon.VisibilityStateOffset
+                    || battleAddon.VisibilityMask != addon.VisibilityMask
+                    || battleAddon.ReadinessOffset != addon.ReadinessOffset
+                    || battleAddon.ReadinessMask != addon.ReadinessMask
+                    || holder.NumberArraysOffset % 8 != 0
+                    || holder.StringArraysOffset % 8 != 0
+                    || battleTalk.NumberValuesOffset % 8 != 0
+                    || battleTalk.StringValuesOffset % 8 != 0
+                    || arrayData.SizeOffset + sizeof(int) > arrayData.UpdateStateOffset) {
+                    throw new InvalidDataException("BattleTalk resource must share addon identity and use valid array headers.");
+                }
             }
 
             HermesValidation validation = manifest.Validation ?? throw new InvalidDataException("Validation metadata is missing.");

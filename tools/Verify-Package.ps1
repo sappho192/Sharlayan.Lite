@@ -11,7 +11,7 @@ param(
 
     [string] $ExpectedRepositoryUrl = 'https://github.com/sappho192/Sharlayan.Lite',
 
-    [long] $MaximumBytes = 650000
+    [long] $MaximumBytes = 800000
 )
 
 $ErrorActionPreference = 'Stop'
@@ -82,6 +82,7 @@ function Assert-PublicPackageContract {
     $readerType = $assembly.GetType('Sharlayan.Reader', $true)
     $talkResultType = $assembly.GetType('Sharlayan.Models.ReadResults.TalkResult', $true)
     $talkSourceType = $assembly.GetType('Sharlayan.Models.ReadResults.TalkSource', $true)
+    $battleTalkResultType = $assembly.GetType('Sharlayan.Models.ReadResults.BattleTalkResult', $true)
     $informationalVersion = @(
         $assembly.GetCustomAttributes([System.Reflection.AssemblyInformationalVersionAttribute], $false)
     )[0].InformationalVersion
@@ -100,6 +101,8 @@ function Assert-PublicPackageContract {
         GetTalk = $talkResultType
         GetCurrentTalk = $talkResultType
         GetLastTalk = $talkResultType
+        CanGetBattleTalk = [bool]
+        GetBattleTalk = $battleTalkResultType
     }
     foreach ($contract in $methodContracts.GetEnumerator()) {
         $method = $readerType.GetMethod(
@@ -128,6 +131,33 @@ function Assert-PublicPackageContract {
             -not $property.GetMethod.IsPublic -or
             $property.PropertyType -ne $contract.Value) {
             throw "Package public contract is missing TalkResult.$($contract.Key)."
+        }
+    }
+
+    $resultContracts = @(
+        [pscustomobject]@{
+            Type = $battleTalkResultType
+            Name = 'BattleTalkResult'
+            Properties = @{
+                IsAvailable = [bool]
+                IsVisible = [bool]
+                Name = [string]
+                Text = [string]
+                Sequence = [long]
+            }
+        }
+    )
+    foreach ($resultContract in $resultContracts) {
+        foreach ($contract in $resultContract.Properties.GetEnumerator()) {
+            $property = $resultContract.Type.GetProperty(
+                $contract.Key,
+                [System.Reflection.BindingFlags]::Instance -bor [System.Reflection.BindingFlags]::Public)
+            if ($null -eq $property -or
+                $null -eq $property.GetMethod -or
+                -not $property.GetMethod.IsPublic -or
+                $property.PropertyType -ne $contract.Value) {
+                throw "Package public contract is missing $($resultContract.Name).$($contract.Key)."
+            }
         }
     }
 }

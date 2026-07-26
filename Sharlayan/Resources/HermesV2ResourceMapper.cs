@@ -12,17 +12,20 @@ namespace Sharlayan.Resources {
             Signature[] signatures,
             StructuresContainer structures,
             TalkMemoryLayout talkLayout,
-            CurrentTalkMemoryLayout currentTalkLayout) {
+            CurrentTalkMemoryLayout currentTalkLayout,
+            BattleTalkMemoryLayout battleTalkLayout) {
             this.Signatures = signatures;
             this.Structures = structures;
             this.TalkLayout = talkLayout;
             this.CurrentTalkLayout = currentTalkLayout;
+            this.BattleTalkLayout = battleTalkLayout;
         }
 
         internal Signature[] Signatures { get; }
         internal StructuresContainer Structures { get; }
         internal TalkMemoryLayout TalkLayout { get; }
         internal CurrentTalkMemoryLayout CurrentTalkLayout { get; }
+        internal BattleTalkMemoryLayout BattleTalkLayout { get; }
     }
 
     internal sealed class TalkMemoryLayout {
@@ -60,6 +63,37 @@ namespace Sharlayan.Resources {
         internal string AddonName { get; set; }
         internal int TextValueIndex { get; set; }
         internal int NameValueIndex { get; set; }
+    }
+
+    internal sealed class BattleTalkMemoryLayout {
+        internal int RaptureAtkModuleOffset { get; set; }
+        internal int RaptureAtkUnitManagerOffset { get; set; }
+        internal int AllLoadedUnitsListOffset { get; set; }
+        internal int EntriesOffset { get; set; }
+        internal int CountOffset { get; set; }
+        internal int Capacity { get; set; }
+        internal int EntrySize { get; set; }
+        internal int AddonNameOffset { get; set; }
+        internal int AddonNameCapacity { get; set; }
+        internal int VisibilityStateOffset { get; set; }
+        internal uint VisibilityMask { get; set; }
+        internal int ReadinessOffset { get; set; }
+        internal uint ReadinessMask { get; set; }
+        internal string AddonName { get; set; }
+        internal int AtkArrayDataHolderOffset { get; set; }
+        internal int NumberArrayCountOffset { get; set; }
+        internal int NumberArraysOffset { get; set; }
+        internal int StringArrayCountOffset { get; set; }
+        internal int StringArraysOffset { get; set; }
+        internal int ArraySizeOffset { get; set; }
+        internal int ArrayUpdateStateOffset { get; set; }
+        internal int NumberValuesOffset { get; set; }
+        internal int StringValuesOffset { get; set; }
+        internal int NumberArrayId { get; set; }
+        internal int StringArrayId { get; set; }
+        internal int VisibleIndex { get; set; }
+        internal int NameIndex { get; set; }
+        internal int TextIndex { get; set; }
     }
 
     internal static class HermesV2ResourceMapper {
@@ -119,7 +153,47 @@ namespace Sharlayan.Resources {
                 TextValueIndex = currentTalk.TextValueIndex,
                 NameValueIndex = currentTalk.NameValueIndex,
             };
-            return new HermesMappedResources(signatures, structures, layout, currentLayout);
+            BattleTalkMemoryLayout battleLayout = null;
+            HermesBattleTalkResource battle = manifest.Resources.BattleTalk;
+            if (battle != null) {
+                battleLayout = new BattleTalkMemoryLayout {
+                    RaptureAtkModuleOffset = battle.RaptureAtkModuleOffset,
+                    RaptureAtkUnitManagerOffset = battle.RaptureAtkUnitManagerOffset,
+                    AllLoadedUnitsListOffset = battle.AllLoadedUnitsListOffset,
+                    EntriesOffset = battle.AtkUnitList.EntriesOffset,
+                    CountOffset = battle.AtkUnitList.CountOffset,
+                    Capacity = battle.AtkUnitList.Capacity,
+                    EntrySize = battle.AtkUnitList.EntrySize,
+                    AddonNameOffset = battle.Addon.NameOffset,
+                    AddonNameCapacity = battle.Addon.NameCapacity,
+                    VisibilityStateOffset = battle.Addon.VisibilityStateOffset,
+                    VisibilityMask = battle.Addon.VisibilityMask,
+                    ReadinessOffset = battle.Addon.ReadinessOffset,
+                    ReadinessMask = battle.Addon.ReadinessMask,
+                    AddonName = battle.AddonName,
+                    AtkArrayDataHolderOffset = battle.AtkArrayDataHolderOffset,
+                    NumberArrayCountOffset = battle.ArrayDataHolder.NumberArrayCountOffset,
+                    NumberArraysOffset = battle.ArrayDataHolder.NumberArraysOffset,
+                    StringArrayCountOffset = battle.ArrayDataHolder.StringArrayCountOffset,
+                    StringArraysOffset = battle.ArrayDataHolder.StringArraysOffset,
+                    ArraySizeOffset = battle.ArrayData.SizeOffset,
+                    ArrayUpdateStateOffset = battle.ArrayData.UpdateStateOffset,
+                    NumberValuesOffset = battle.NumberValuesOffset,
+                    StringValuesOffset = battle.StringValuesOffset,
+                    NumberArrayId = battle.NumberArrayId,
+                    StringArrayId = battle.StringArrayId,
+                    VisibleIndex = battle.VisibleIndex,
+                    NameIndex = battle.NameIndex,
+                    TextIndex = battle.TextIndex,
+                };
+            }
+
+            return new HermesMappedResources(
+                signatures,
+                structures,
+                layout,
+                currentLayout,
+                battleLayout);
         }
 
         private static Signature CreateSignature(string key, string pattern, long rewindOffset, int uiModuleOffset, int resourceOffset) {

@@ -5,6 +5,10 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.Globalization;
 using System.Runtime.InteropServices;
+using System.Security.Cryptography;
+using System.Text;
+
+using Newtonsoft.Json;
 
 using Sharlayan;
 using Sharlayan.Models;
@@ -124,6 +128,27 @@ internal static class Program {
                         handler.Reader.CanGetTalk(),
                         handler.Reader.GetTalk(),
                         options.PrintTalk);
+                }
+
+                if (options.RequireBattleTalk) {
+                    ValidateBattleTalk(
+                        handler.Reader.CanGetBattleTalk(),
+                        handler.Reader.GetBattleTalk(),
+                        options.PrintTalk);
+                }
+
+                if (options.BattleTalkSequenceSeconds > 0) {
+                    await RunBattleTalkSequenceProbe(
+                        handler,
+                        process,
+                        exceptions,
+                        options,
+                        firstPoll.PreviousArrayIndex,
+                        firstPoll.PreviousOffset);
+                }
+
+                if (options.BattleTalkProbeLayoutPath != null) {
+                    await RunBattleTalkContractProbe(handler, process, exceptions, resourceInfo, options);
                 }
 
                 if (options.ConcurrentReaders > 1) {
@@ -386,10 +411,239 @@ internal static class Program {
         }
     }
 
+    private static void ValidateBattleTalk(
+        bool canRead,
+        BattleTalkResult battleTalk,
+        bool printTalk) {
+        if (!canRead) {
+            throw new InvalidOperationException("BattleTalk resource was not resolved.");
+        }
+
+        if (!battleTalk.IsAvailable
+            || !battleTalk.IsVisible
+            || string.IsNullOrEmpty(battleTalk.Text)
+            || battleTalk.Sequence < 1) {
+            throw new InvalidOperationException(
+                "No visible BattleTalk value is available. Open a BattleTalk and retry.");
+        }
+
+        Console.WriteLine(
+            $"BattleTalk: available, visible, sequence={battleTalk.Sequence}, "
+            + $"nameUtf16Length={battleTalk.Name.Length}, textUtf16Length={battleTalk.Text.Length}");
+        if (printTalk) {
+            Console.WriteLine($"BattleTalk name: {battleTalk.Name}");
+            Console.WriteLine($"BattleTalk text: {battleTalk.Text}");
+        }
+    }
+
+    private static async Task RunBattleTalkSequenceProbe(
+        MemoryHandler handler,
+        Process process,
+        ConcurrentQueue<Exception> exceptions,
+        Options options,
+        int chatArrayIndex,
+        int chatOffset) {
+        if (!handler.Reader.CanGetBattleTalk()) {
+            throw new InvalidOperationException("BattleTalk resource was not resolved.");
+        }
+
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        TimeSpan duration = TimeSpan.FromSeconds(options.BattleTalkSequenceSeconds);
+        TimeSpan interval = TimeSpan.FromMilliseconds(options.BattleTalkSequenceIntervalMilliseconds);
+        string? previous = null;
+        long maximumSequence = 0;
+        int changes = 0;
+        int relevantChatEntries = 0;
+        int correlatedChatEntries = 0;
+        string visibleText = string.Empty;
+        Console.WriteLine(
+            $"BattleTalk sequence probe: interval={options.BattleTalkSequenceIntervalMilliseconds}ms, "
+            + $"duration={options.BattleTalkSequenceSeconds}s");
+        while (stopwatch.Elapsed < duration) {
+            if (process.HasExited) {
+                throw new InvalidOperationException("FFXIV exited during the BattleTalk sequence probe.");
+            }
+
+            BattleTalkResult result = handler.Reader.GetBattleTalk();
+            if (result.Sequence < maximumSequence) {
+                throw new InvalidOperationException("BattleTalk Sequence moved backwards.");
+            }
+
+            maximumSequence = Math.Max(maximumSequence, result.Sequence);
+            if (result.IsAvailable) {
+                visibleText = result.IsVisible ? result.Text : string.Empty;
+            }
+            string fingerprint =
+                $"{result.IsAvailable}:{result.IsVisible}:{result.Sequence}:{HashText(result.Name)}:{HashText(result.Text)}";
+            if (!string.Equals(previous, fingerprint, StringComparison.Ordinal)) {
+                previous = fingerprint;
+                changes++;
+                Console.WriteLine(
+                    $"BT-API {stopwatch.Elapsed.TotalSeconds,7:F3}s "
+                    + $"available={result.IsAvailable} visible={result.IsVisible} sequence={result.Sequence} "
+                    + $"nameLength={result.Name.Length} nameHash={HashText(result.Name)} "
+                    + $"textLength={result.Text.Length} textHash={HashText(result.Text)}");
+            }
+
+            ChatLogResult chat = handler.Reader.GetChatLog(chatArrayIndex, chatOffset);
+            chatArrayIndex = chat.PreviousArrayIndex;
+            chatOffset = chat.PreviousOffset;
+            while (chat.ChatLogItems.TryDequeue(out var item)) {
+                if (!int.TryParse(
+                        item.Code,
+                        NumberStyles.HexNumber,
+                        CultureInfo.InvariantCulture,
+                        out int code)
+                    || (code != 0x3D && code != 0x2AB9)) {
+                    continue;
+                }
+
+                relevantChatEntries++;
+                string message = item.Message ?? string.Empty;
+                bool correlated = !string.IsNullOrEmpty(visibleText)
+                                  && !string.IsNullOrEmpty(message)
+                                  && (string.Equals(message, visibleText, StringComparison.Ordinal)
+                                      || message.Contains(visibleText, StringComparison.Ordinal)
+                                      || visibleText.Contains(message, StringComparison.Ordinal));
+                if (correlated) correlatedChatEntries++;
+                Console.WriteLine(
+                    $"BT-CHAT code={item.Code} messageLength={message.Length} "
+                    + $"messageHash={HashText(message)} correlated={correlated}");
+            }
+
+            ThrowIfObserved(exceptions);
+            TimeSpan remaining = duration - stopwatch.Elapsed;
+            if (remaining > TimeSpan.Zero) {
+                await Task.Delay(remaining < interval ? remaining : interval);
+            }
+        }
+
+        Console.WriteLine(
+            $"BattleTalk sequence probe complete: changes={changes}, maximumSequence={maximumSequence}, "
+            + $"relevantChatEntries={relevantChatEntries}, correlatedChatEntries={correlatedChatEntries}");
+    }
+
+    private static string HashText(string value) {
+        if (string.IsNullOrEmpty(value)) return "-";
+        byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(value));
+        return Convert.ToHexString(hash, 0, 6).ToLowerInvariant();
+    }
+
+    private static async Task RunBattleTalkContractProbe(
+        MemoryHandler handler,
+        Process process,
+        ConcurrentQueue<Exception> exceptions,
+        ResourceInfo resourceInfo,
+        Options options) {
+        string json = File.ReadAllText(options.BattleTalkProbeLayoutPath!);
+        BattleTalkProbeLayout layout = JsonConvert.DeserializeObject<BattleTalkProbeLayout>(json)
+            ?? throw new InvalidDataException("BattleTalk probe layout could not be deserialized.");
+        if (!handler.Scanner.Locations.TryGetValue(
+                Signatures.CURRENT_TALK_UI_MODULE_POINTER_KEY,
+                out MemoryLocation? location)) {
+            throw new InvalidOperationException("UI module pointer location was not resolved.");
+        }
+
+        if (!string.Equals(resourceInfo.FcsCommit, layout.FcsCommit, StringComparison.OrdinalIgnoreCase)) {
+            Console.WriteLine(
+                $"BattleTalk probe warning: runtime manifest FCS={resourceInfo.FcsCommit}, probe layout FCS={layout.FcsCommit}");
+        }
+
+        IntPtr uiModulePointerAddress = location.GetAddress();
+        Stopwatch stopwatch = Stopwatch.StartNew();
+        TimeSpan duration = TimeSpan.FromSeconds(options.BattleTalkProbeSeconds);
+        TimeSpan interval = TimeSpan.FromMilliseconds(options.BattleTalkProbeIntervalMilliseconds);
+        string? previousFingerprint = null;
+        int observations = 0;
+        int changes = 0;
+        Console.WriteLine(
+            $"BattleTalk probe: layout={options.BattleTalkProbeLayoutPath}, interval={options.BattleTalkProbeIntervalMilliseconds}ms, duration={options.BattleTalkProbeSeconds}s");
+        while (stopwatch.Elapsed < duration) {
+            if (process.HasExited) {
+                throw new InvalidOperationException("FFXIV exited during the BattleTalk contract probe.");
+            }
+
+            BattleTalkProbeObservation observation =
+                BattleTalkContractProbe.Read(handler.Peek, uiModulePointerAddress, layout);
+            observations++;
+            if (!string.Equals(previousFingerprint, observation.Fingerprint, StringComparison.Ordinal)) {
+                changes++;
+                previousFingerprint = observation.Fingerprint;
+                PrintBattleTalkObservation(stopwatch.Elapsed, observation);
+            }
+
+            ThrowIfObserved(exceptions);
+            TimeSpan remaining = duration - stopwatch.Elapsed;
+            if (remaining > TimeSpan.Zero) {
+                await Task.Delay(remaining < interval ? remaining : interval);
+            }
+        }
+
+        Console.WriteLine($"BattleTalk probe complete: observations={observations}, changes={changes}");
+    }
+
+    private static void PrintBattleTalkObservation(TimeSpan elapsed, BattleTalkProbeObservation observation) {
+        BattleTalkProbeAddonObservation addon = observation.Addon;
+        Console.WriteLine(
+            $"BT {elapsed.TotalSeconds,7:F3}s fp={ShortHash(observation.Fingerprint)} "
+            + $"addon=r{Bool(addon.IsReadable)}f{Bool(addon.IsFound)}v{Bool(addon.IsVisible)}y{Bool(addon.IsReady)}"
+            + $"/count={addon.AtkValueCount}/strings={FormatStrings(addon.Strings)} "
+            + $"number=r{Bool(observation.NumberArray.IsReadable)}/u{observation.NumberArray.UpdateState}"
+            + $"/values=[{string.Join(",", observation.NumberArray.Values)}] "
+            + $"string=r{Bool(observation.StringArray.IsReadable)}/u{observation.StringArray.UpdateState}"
+            + $"/values={FormatStrings(observation.StringArray.Values)} "
+            + $"queue={FormatQueue(observation.QueueSlots)}");
+    }
+
+    private static string FormatStrings(IReadOnlyDictionary<int, BattleTalkProbeString> values) {
+        return "[" + string.Join(
+            ",",
+            values.Select(pair =>
+                $"{pair.Key}:p{pair.Value.Pointer.ToInt64():X}:l{pair.Value.Utf8Length}:h{ShortHash(pair.Value.Hash)}"))
+            + "]";
+    }
+
+    private static string FormatQueue(IReadOnlyList<BattleTalkProbeQueueSlot> slots) {
+        return "[" + string.Join(
+            ",",
+            slots.Where(slot =>
+                    !slot.IsReadable
+                    || slot.IsPending
+                    || (slot.Name != null && slot.Name.Utf8Length > 0)
+                    || (slot.Text != null && slot.Text.Utf8Length > 0))
+                .Select(slot =>
+                    $"{slot.Index}:r{Bool(slot.IsReadable)}p{Bool(slot.IsPending)}/s{slot.Style}"
+                    + $"/n={FormatString(slot.Name)}/t={FormatString(slot.Text)}"
+                    + $"/i{slot.Image}/a{slot.Sound}/e{slot.EntityId}"))
+            + "]";
+    }
+
+    private static string FormatString(BattleTalkProbeString? value) {
+        return value == null
+            ? "-"
+            : $"p{value.Pointer.ToInt64():X}:l{value.Utf8Length}:h{ShortHash(value.Hash)}";
+    }
+
+    private static string ShortHash(string value) {
+        return string.IsNullOrEmpty(value) ? "-" : value.Substring(0, Math.Min(12, value.Length));
+    }
+
+    private static int Bool(bool value) => value ? 1 : 0;
+
     private sealed class Options {
         public int InitializationTimeoutSeconds { get; private set; } = 30;
 
         public bool AttachOnly { get; private set; }
+
+        public int BattleTalkProbeIntervalMilliseconds { get; private set; } = 100;
+
+        public string? BattleTalkProbeLayoutPath { get; private set; }
+
+        public int BattleTalkProbeSeconds { get; private set; } = 120;
+
+        public int BattleTalkSequenceIntervalMilliseconds { get; private set; } = 100;
+
+        public int BattleTalkSequenceSeconds { get; private set; }
 
         public Uri? HermesV2LatestUri { get; private set; }
 
@@ -421,6 +675,8 @@ internal static class Program {
 
         public bool RequireCurrentTalk { get; private set; }
 
+        public bool RequireBattleTalk { get; private set; }
+
         public bool RequireLastTalk { get; private set; }
 
         public bool RequireTalk { get; private set; }
@@ -431,6 +687,21 @@ internal static class Program {
                 switch (args[index]) {
                     case "--attach-only":
                         options.AttachOnly = true;
+                        break;
+                    case "--battle-talk-probe-interval":
+                        options.BattleTalkProbeIntervalMilliseconds = ReadPositiveInt(args, ref index);
+                        break;
+                    case "--battle-talk-probe-layout":
+                        options.BattleTalkProbeLayoutPath = Path.GetFullPath(ReadString(args, ref index));
+                        break;
+                    case "--battle-talk-probe-seconds":
+                        options.BattleTalkProbeSeconds = ReadPositiveInt(args, ref index);
+                        break;
+                    case "--battle-talk-sequence-interval":
+                        options.BattleTalkSequenceIntervalMilliseconds = ReadPositiveInt(args, ref index);
+                        break;
+                    case "--battle-talk-sequence-seconds":
+                        options.BattleTalkSequenceSeconds = ReadPositiveInt(args, ref index);
                         break;
                     case "--initialization-timeout":
                         options.InitializationTimeoutSeconds = ReadPositiveInt(args, ref index);
@@ -480,6 +751,9 @@ internal static class Program {
                     case "--require-current-talk":
                         options.RequireCurrentTalk = true;
                         break;
+                    case "--require-battle-talk":
+                        options.RequireBattleTalk = true;
+                        break;
                     case "--require-last-talk":
                         options.RequireLastTalk = true;
                         break;
@@ -501,6 +775,18 @@ internal static class Program {
 
             if (options.ConcurrentCalls > 10000) {
                 throw new ArgumentOutOfRangeException(nameof(args), "--concurrent-calls cannot exceed 10000.");
+            }
+
+            if (options.BattleTalkProbeIntervalMilliseconds > 200) {
+                throw new ArgumentOutOfRangeException(
+                    nameof(args),
+                    "--battle-talk-probe-interval cannot exceed 200 ms.");
+            }
+
+            if (options.BattleTalkSequenceIntervalMilliseconds > 200) {
+                throw new ArgumentOutOfRangeException(
+                    nameof(args),
+                    "--battle-talk-sequence-interval cannot exceed 200 ms.");
             }
 
             return options;

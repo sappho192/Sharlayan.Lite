@@ -49,11 +49,11 @@ jobs:
 
       - name: Verify package
         shell: pwsh
-        run: ./tools/Verify-Package.ps1 -PackageDirectory artifacts/packages -ExpectedPackageVersion 9.1.4 -ExpectedRepositoryCommit $env:GITHUB_SHA
+        run: ./tools/Verify-Package.ps1 -PackageDirectory artifacts/packages -ExpectedPackageVersion 9.2.0 -ExpectedRepositoryCommit $env:GITHUB_SHA
 
       - name: Verify clean package consumer
         shell: pwsh
-        run: ./tools/Verify-PackageConsumer.ps1 -PackageDirectory artifacts/packages -ExpectedPackageVersion 9.1.4 -ExpectedRepositoryCommit $env:GITHUB_SHA
+        run: ./tools/Verify-PackageConsumer.ps1 -PackageDirectory artifacts/packages -ExpectedPackageVersion 9.2.0 -ExpectedRepositoryCommit $env:GITHUB_SHA
 
       - name: Upload package artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

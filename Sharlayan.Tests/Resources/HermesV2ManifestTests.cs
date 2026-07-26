@@ -139,6 +139,61 @@ namespace Sharlayan.Tests.Resources {
             Assert.Equal(new[] { 0x28 }, mapped.CurrentTalkLayout.AllowedStringTypes);
         }
 
+        [Fact]
+        public void ParserAndMapperAcceptOptionalBattleTalk() {
+            JObject json = JObject.Parse(Encoding.UTF8.GetString(ReadEmbeddedFixture()));
+            json["compatibility"]["minimumSharlayanVersion"] = "9.2.0";
+            json["resources"]["battleTalk"] = new JObject {
+                ["root"] = "framework",
+                ["semantics"] = "currentBattleTalk",
+                ["uiModuleOffset"] = 11112,
+                ["raptureAtkModuleOffset"] = 861808,
+                ["raptureAtkUnitManagerOffset"] = 78880,
+                ["allLoadedUnitsListOffset"] = 26880,
+                ["atkUnitList"] = json["resources"]["currentTalk"]["atkUnitList"].DeepClone(),
+                ["addon"] = new JObject {
+                    ["nameOffset"] = 8,
+                    ["nameCapacity"] = 32,
+                    ["visibilityStateOffset"] = 408,
+                    ["visibilityMask"] = 2097152,
+                    ["readinessOffset"] = 417,
+                    ["readinessMask"] = 1,
+                },
+                ["addonName"] = "_BattleTalk",
+                ["atkArrayDataHolderOffset"] = 7080,
+                ["arrayDataHolder"] = new JObject {
+                    ["numberArrayCountOffset"] = 0,
+                    ["numberArraysOffset"] = 24,
+                    ["stringArrayCountOffset"] = 2,
+                    ["stringArraysOffset"] = 48,
+                },
+                ["arrayData"] = new JObject {
+                    ["sizeOffset"] = 8,
+                    ["updateStateOffset"] = 31,
+                },
+                ["numberValuesOffset"] = 40,
+                ["stringValuesOffset"] = 40,
+                ["numberArrayId"] = 38,
+                ["stringArrayId"] = 35,
+                ["visibleIndex"] = 0,
+                ["nameIndex"] = 0,
+                ["textIndex"] = 1,
+                ["sequenceSemantics"] = "visibilityOrContentGeneration",
+            };
+            byte[] bytes = Encoding.UTF8.GetBytes(json.ToString(Newtonsoft.Json.Formatting.None));
+
+            HermesV2Manifest manifest =
+                HermesV2ManifestParser.ParseManifest(bytes, null, "9.2.0", allowCandidate: true);
+            HermesMappedResources mapped = HermesV2ResourceMapper.Map(manifest);
+
+            Assert.NotNull(mapped.BattleTalkLayout);
+            Assert.Equal("_BattleTalk", mapped.BattleTalkLayout.AddonName);
+            Assert.Equal(38, mapped.BattleTalkLayout.NumberArrayId);
+            Assert.Equal(35, mapped.BattleTalkLayout.StringArrayId);
+            Assert.Equal(0, mapped.BattleTalkLayout.NameIndex);
+            Assert.Equal(1, mapped.BattleTalkLayout.TextIndex);
+        }
+
         internal static byte[] CreateLiveManifest(string minimumVersion = "9.1.2") {
             JObject json = JObject.Parse(Encoding.UTF8.GetString(ReadEmbeddedFixture()));
             json["compatibility"]["minimumSharlayanVersion"] = minimumVersion;
