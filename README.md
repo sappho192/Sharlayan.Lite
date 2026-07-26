@@ -1,6 +1,6 @@
 # Sharlayan.Lite
 
-This fork is a lightweight version of the original library and only has memory search & ChatLog functionality.
+This fork is a lightweight version of the original library with memory search, ChatLog, and dialogue UI readers.
 
 Supported targets: .NET Framework 4.6.2 and 4.8, plus .NET 6, 7, 8, and 10.
 
@@ -12,9 +12,9 @@ Supported targets: .NET Framework 4.6.2 and 4.8, plus .NET 6, 7, 8, and 10.
 
 # How do I use it and what comes back?
 
-- .NET CLI: `dotnet add package Sharlayan.Lite --version 9.1.4`
-- Nuget Package Manager: `Install-Package Sharlayan.Lite -Version 9.1.4`
-- PackageReference: `<PackageReference Include="Sharlayan.Lite" Version="9.1.4" />`
+- .NET CLI: `dotnet add package Sharlayan.Lite --version 9.2.0`
+- Nuget Package Manager: `Install-Package Sharlayan.Lite -Version 9.2.0`
+- PackageReference: `<PackageReference Include="Sharlayan.Lite" Version="9.2.0" />`
 
 That's the basic of it. For actual instantiation it works as follows:
 
@@ -115,6 +115,21 @@ back to FCS `LastTalkName`/`LastTalkText` (`Source=Last`, `IsVisible=false`) whe
 available. Use `GetCurrentTalk()` or `GetLastTalk()` when the distinction is part of the caller's policy.
 Applications consuming the last value should baseline the first value after attach before treating changes
 as new dialogue.
+
+## BattleTalk Reading
+
+```csharp
+if (memoryHandler.Reader.CanGetBattleTalk()) {
+    BattleTalkResult battleTalk = memoryHandler.Reader.GetBattleTalk();
+    if (battleTalk.IsAvailable && battleTalk.IsVisible) {
+        Console.WriteLine($"{battleTalk.Sequence}: {battleTalk.Name}: {battleTalk.Text}");
+    }
+}
+```
+
+The optional capability returns `false` when the selected Hermes manifest does not contain its
+resource. `BattleTalkResult.Sequence` increases for each stable visible generation observed during the
+handler lifetime, including the same name/text pair after a stable hidden state.
 
 The selected resource can be inspected through `memoryHandler.ResourceInfo`, including its source,
 revision, FCS/generator commits, validation status, resolved location count, and fallback reason.

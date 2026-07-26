@@ -1,14 +1,14 @@
 {
   "schemaVersion": 2,
   "compatibility": {
-    "minimumSharlayanVersion": "9.1.2",
+    "minimumSharlayanVersion": "9.2.0",
     "pointerResolverVersion": 1
   },
   "source": {
     "fcsRepository": "https://github.com/aers/FFXIVClientStructs.git",
-    "fcsCommit": "8ff04195c4e77ef0b85d15c6fd1c67785378f0fb",
+    "fcsCommit": "ed2cd7049c4d84d9e2ccb3eb55245ea712b040f1",
     "generatorRepository": "https://github.com/sappho192/ffxiv-hermes.git",
-    "generatorCommit": "746414d55919677c79f6c3709f839ace556551aa"
+    "generatorCommit": "617f2a25b350023e9e65fc5c9a5160042a2f91ce"
   },
   "platform": {
     "process": "ffxiv_dx11.exe",
@@ -75,12 +75,54 @@
       "addonName": "Talk",
       "textValueIndex": 0,
       "nameValueIndex": 1
+    },
+    "battleTalk": {
+      "root": "framework",
+      "semantics": "currentBattleTalk",
+      "uiModuleOffset": 11112,
+      "raptureAtkModuleOffset": 861808,
+      "raptureAtkUnitManagerOffset": 78880,
+      "allLoadedUnitsListOffset": 26880,
+      "atkUnitList": {
+        "entriesOffset": 8,
+        "countOffset": 2056,
+        "capacity": 256,
+        "entrySize": 8
+      },
+      "addon": {
+        "nameOffset": 8,
+        "nameCapacity": 32,
+        "visibilityStateOffset": 408,
+        "visibilityMask": 2097152,
+        "readinessOffset": 417,
+        "readinessMask": 1
+      },
+      "addonName": "_BattleTalk",
+      "atkArrayDataHolderOffset": 7080,
+      "arrayDataHolder": {
+        "numberArrayCountOffset": 0,
+        "numberArraysOffset": 24,
+        "stringArrayCountOffset": 2,
+        "stringArraysOffset": 48
+      },
+      "arrayData": {
+        "sizeOffset": 8,
+        "updateStateOffset": 31
+      },
+      "numberValuesOffset": 40,
+      "stringValuesOffset": 40,
+      "numberArrayId": 38,
+      "stringArrayId": 35,
+      "visibleIndex": 0,
+      "nameIndex": 0,
+      "textIndex": 1,
+      "sequenceSemantics": "visibilityOrContentGeneration"
     }
   },
   "validation": {
     "status": "live-verified",
     "gameVersion": "2026.06.18.0000.0000",
     "executableSha256": "4236e770e673150e85f8d10beab2fc4834c82f86aab8a555a9175439fc906a6d",
-    "verifierCommit": "3e27261f82851e1e88c413a25461e6ca0ad551e8"
+    "verifierCommit": "36ebee4a4926dd45607bf973c6205b8eec04b480"
   }
 }

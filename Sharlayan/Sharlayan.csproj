@@ -15,12 +15,12 @@
 		<GeneratePackageOnBuild>false</GeneratePackageOnBuild>
 		<EnablePackageValidation>true</EnablePackageValidation>
 		<PackageValidationBaselineVersion>8.0.1</PackageValidationBaselineVersion>
-		<Version>9.1.4</Version>
+		<Version>9.2.0</Version>
 		<Company>SyndicatedLife</Company>
 		<Product>Sharlayan.Lite</Product>
-		<Description>Lightweight FFXIV memory scanning with ChatLog and standard NPC Talk reading.</Description>
+		<Description>Lightweight FFXIV memory scanning with ChatLog and dialogue UI reading.</Description>
 		<Copyright>Copyright © 2007 - 2024 Ryan Wilson</Copyright>
-		<FileVersion>9.1.4.0</FileVersion>
+		<FileVersion>9.2.0.0</FileVersion>
 		<AssemblyVersion>8.0.0.0</AssemblyVersion>
 		<RootNamespace>Sharlayan</RootNamespace>
 		<PackageId>Sharlayan.Lite</PackageId>

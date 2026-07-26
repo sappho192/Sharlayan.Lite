@@ -57,6 +57,7 @@ namespace Sharlayan.Models.Resources {
         [JsonProperty("chatLog", Required = Required.Always)] public HermesChatLogResource ChatLog { get; set; }
         [JsonProperty("talk", Required = Required.Always)] public HermesTalkResource Talk { get; set; }
         [JsonProperty("currentTalk", Required = Required.Always)] public HermesCurrentTalkResource CurrentTalk { get; set; }
+        [JsonProperty("battleTalk")] public HermesBattleTalkResource BattleTalk { get; set; }
     }
 
     internal sealed class HermesChatLogResource {
@@ -97,6 +98,29 @@ namespace Sharlayan.Models.Resources {
         [JsonProperty("nameValueIndex", Required = Required.Always)] public int NameValueIndex { get; set; }
     }
 
+    internal sealed class HermesBattleTalkResource {
+        [JsonProperty("root", Required = Required.Always)] public string Root { get; set; }
+        [JsonProperty("semantics", Required = Required.Always)] public string Semantics { get; set; }
+        [JsonProperty("uiModuleOffset", Required = Required.Always)] public int UiModuleOffset { get; set; }
+        [JsonProperty("raptureAtkModuleOffset", Required = Required.Always)] public int RaptureAtkModuleOffset { get; set; }
+        [JsonProperty("raptureAtkUnitManagerOffset", Required = Required.Always)] public int RaptureAtkUnitManagerOffset { get; set; }
+        [JsonProperty("allLoadedUnitsListOffset", Required = Required.Always)] public int AllLoadedUnitsListOffset { get; set; }
+        [JsonProperty("atkUnitList", Required = Required.Always)] public HermesAtkUnitListLayout AtkUnitList { get; set; }
+        [JsonProperty("addon", Required = Required.Always)] public HermesAddonVisibilityLayout Addon { get; set; }
+        [JsonProperty("addonName", Required = Required.Always)] public string AddonName { get; set; }
+        [JsonProperty("atkArrayDataHolderOffset", Required = Required.Always)] public int AtkArrayDataHolderOffset { get; set; }
+        [JsonProperty("arrayDataHolder", Required = Required.Always)] public HermesAtkArrayDataHolderLayout ArrayDataHolder { get; set; }
+        [JsonProperty("arrayData", Required = Required.Always)] public HermesAtkArrayDataLayout ArrayData { get; set; }
+        [JsonProperty("numberValuesOffset", Required = Required.Always)] public int NumberValuesOffset { get; set; }
+        [JsonProperty("stringValuesOffset", Required = Required.Always)] public int StringValuesOffset { get; set; }
+        [JsonProperty("numberArrayId", Required = Required.Always)] public int NumberArrayId { get; set; }
+        [JsonProperty("stringArrayId", Required = Required.Always)] public int StringArrayId { get; set; }
+        [JsonProperty("visibleIndex", Required = Required.Always)] public int VisibleIndex { get; set; }
+        [JsonProperty("nameIndex", Required = Required.Always)] public int NameIndex { get; set; }
+        [JsonProperty("textIndex", Required = Required.Always)] public int TextIndex { get; set; }
+        [JsonProperty("sequenceSemantics", Required = Required.Always)] public string SequenceSemantics { get; set; }
+    }
+
     internal sealed class HermesAtkUnitListLayout {
         [JsonProperty("entriesOffset", Required = Required.Always)] public int EntriesOffset { get; set; }
         [JsonProperty("countOffset", Required = Required.Always)] public int CountOffset { get; set; }
@@ -113,6 +137,27 @@ namespace Sharlayan.Models.Resources {
         [JsonProperty("readinessMask", Required = Required.Always)] public uint ReadinessMask { get; set; }
         [JsonProperty("atkValuesPointerOffset", Required = Required.Always)] public int AtkValuesPointerOffset { get; set; }
         [JsonProperty("atkValuesCountOffset", Required = Required.Always)] public int AtkValuesCountOffset { get; set; }
+    }
+
+    internal sealed class HermesAddonVisibilityLayout {
+        [JsonProperty("nameOffset", Required = Required.Always)] public int NameOffset { get; set; }
+        [JsonProperty("nameCapacity", Required = Required.Always)] public int NameCapacity { get; set; }
+        [JsonProperty("visibilityStateOffset", Required = Required.Always)] public int VisibilityStateOffset { get; set; }
+        [JsonProperty("visibilityMask", Required = Required.Always)] public uint VisibilityMask { get; set; }
+        [JsonProperty("readinessOffset", Required = Required.Always)] public int ReadinessOffset { get; set; }
+        [JsonProperty("readinessMask", Required = Required.Always)] public uint ReadinessMask { get; set; }
+    }
+
+    internal sealed class HermesAtkArrayDataHolderLayout {
+        [JsonProperty("numberArrayCountOffset", Required = Required.Always)] public int NumberArrayCountOffset { get; set; }
+        [JsonProperty("numberArraysOffset", Required = Required.Always)] public int NumberArraysOffset { get; set; }
+        [JsonProperty("stringArrayCountOffset", Required = Required.Always)] public int StringArrayCountOffset { get; set; }
+        [JsonProperty("stringArraysOffset", Required = Required.Always)] public int StringArraysOffset { get; set; }
+    }
+
+    internal sealed class HermesAtkArrayDataLayout {
+        [JsonProperty("sizeOffset", Required = Required.Always)] public int SizeOffset { get; set; }
+        [JsonProperty("updateStateOffset", Required = Required.Always)] public int UpdateStateOffset { get; set; }
     }
 
     internal sealed class HermesAtkValueLayout {
