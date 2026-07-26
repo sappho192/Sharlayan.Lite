@@ -20,7 +20,7 @@ namespace Sharlayan.Tests.Resources {
 
             Assert.Equal(2, manifest.SchemaVersion);
             Assert.Equal("ed2cd7049c4d84d9e2ccb3eb55245ea712b040f1", manifest.Source.FcsCommit);
-            Assert.Equal("sha256:065e24246f0707101601d76fd23ce159d26f74f60c0368a589ef4da0a7abb701", HermesV2ManifestParser.CalculateRevision(bytes));
+            Assert.Equal("sha256:88377d75d7031b077962dd391e2885c7c4f536ccead01d07c321b1262a6b0b9b", HermesV2ManifestParser.CalculateRevision(bytes));
         }
 
         [Fact]

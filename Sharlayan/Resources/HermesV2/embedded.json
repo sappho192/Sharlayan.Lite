@@ -8,7 +8,7 @@
     "fcsRepository": "https://github.com/aers/FFXIVClientStructs.git",
     "fcsCommit": "ed2cd7049c4d84d9e2ccb3eb55245ea712b040f1",
     "generatorRepository": "https://github.com/sappho192/ffxiv-hermes.git",
-    "generatorCommit": "1a2ebec35e7f7f840e163e052ee02b7fce1bf1c6"
+    "generatorCommit": "617f2a25b350023e9e65fc5c9a5160042a2f91ce"
   },
   "platform": {
     "process": "ffxiv_dx11.exe",
