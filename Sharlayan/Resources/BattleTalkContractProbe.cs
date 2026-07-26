@@ -329,8 +329,11 @@ namespace Sharlayan.Resources {
             value = BattleTalkProbeString.Empty;
             try {
                 StrictUtf8.GetString(bytes, 0, count);
-                string hash = ToLowerHex(SHA256.Create().ComputeHash(bytes, 0, count))
-                    .Substring(0, 16);
+                string hash;
+                using (SHA256 sha256 = SHA256.Create()) {
+                    hash = ToLowerHex(sha256.ComputeHash(bytes, 0, count)).Substring(0, 16);
+                }
+
                 value = new BattleTalkProbeString(pointer, count, hash);
                 return true;
             }
@@ -379,7 +382,9 @@ namespace Sharlayan.Resources {
             }
 
             byte[] bytes = Encoding.UTF8.GetBytes(builder.ToString());
-            return ToLowerHex(SHA256.Create().ComputeHash(bytes));
+            using (SHA256 sha256 = SHA256.Create()) {
+                return ToLowerHex(sha256.ComputeHash(bytes));
+            }
         }
 
         private static string ToLowerHex(byte[] bytes) {
