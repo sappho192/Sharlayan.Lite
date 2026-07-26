@@ -26,7 +26,7 @@ namespace Sharlayan.Tests.Resources {
                     schemaVersion = 2,
                     resourceRevision = revision,
                     manifest = "manifests/" + revision + ".json",
-                    fcsCommit = "8ff04195c4e77ef0b85d15c6fd1c67785378f0fb",
+                    fcsCommit = "ed2cd7049c4d84d9e2ccb3eb55245ea712b040f1",
                     publishedAt = "2026-07-22T00:00:00Z",
                 }));
                 FakeTransport transport = new FakeTransport(
@@ -38,14 +38,14 @@ namespace Sharlayan.Tests.Resources {
                     ResourceCacheDirectory = cacheDirectory,
                 };
 
-                IReadOnlyList<HermesManifestCandidate> remote = await new HermesV2ResourceProvider(configuration, transport, "9.1.2").GetCandidatesAsync(CancellationToken.None);
+                IReadOnlyList<HermesManifestCandidate> remote = await new HermesV2ResourceProvider(configuration, transport, "9.2.0").GetCandidatesAsync(CancellationToken.None);
                 Assert.True(remote[0].Info.Source == ResourceSource.Remote, remote[0].Info.FallbackReason);
                 HermesV2ResourceCache cache = new HermesV2ResourceCache(cacheDirectory);
                 Assert.True(cache.TryReadLatest(out byte[] cachedLatest, out _), remote[0].Info.FallbackReason);
                 HermesLatestPointer cachedPointer = HermesV2ManifestParser.ParseLatest(cachedLatest);
                 Assert.True(cache.TryReadManifest(cachedPointer.ResourceRevision, out byte[] cachedBytes));
-                Assert.NotNull(HermesV2ManifestParser.ParseManifest(cachedBytes, cachedPointer.ResourceRevision, "9.1.2", allowCandidate: false));
-                IReadOnlyList<HermesManifestCandidate> fallback = await new HermesV2ResourceProvider(configuration, new ThrowingTransport(), "9.1.2").GetCandidatesAsync(CancellationToken.None);
+                Assert.NotNull(HermesV2ManifestParser.ParseManifest(cachedBytes, cachedPointer.ResourceRevision, "9.2.0", allowCandidate: false));
+                IReadOnlyList<HermesManifestCandidate> fallback = await new HermesV2ResourceProvider(configuration, new ThrowingTransport(), "9.2.0").GetCandidatesAsync(CancellationToken.None);
 
                 Assert.Equal(revision, remote[0].Info.ResourceRevision);
                 Assert.Equal(ResourceSource.Cache, fallback[0].Info.Source);
@@ -63,7 +63,7 @@ namespace Sharlayan.Tests.Resources {
             SharlayanConfiguration configuration = new SharlayanConfiguration { ResourceMode = ResourceMode.EmbeddedOnly };
             CountingTransport transport = new CountingTransport();
 
-            IReadOnlyList<HermesManifestCandidate> candidates = await new HermesV2ResourceProvider(configuration, transport, "9.1.2").GetCandidatesAsync(CancellationToken.None);
+            IReadOnlyList<HermesManifestCandidate> candidates = await new HermesV2ResourceProvider(configuration, transport, "9.2.0").GetCandidatesAsync(CancellationToken.None);
 
             Assert.Equal(0, transport.CallCount);
             Assert.Single(candidates);
@@ -78,7 +78,7 @@ namespace Sharlayan.Tests.Resources {
             };
             CountingTransport transport = new CountingTransport();
 
-            IReadOnlyList<HermesManifestCandidate> candidates = await new HermesV2ResourceProvider(configuration, transport, "9.1.2").GetCandidatesAsync(CancellationToken.None);
+            IReadOnlyList<HermesManifestCandidate> candidates = await new HermesV2ResourceProvider(configuration, transport, "9.2.0").GetCandidatesAsync(CancellationToken.None);
 
             Assert.Equal(0, transport.CallCount);
             Assert.Single(candidates);
@@ -105,7 +105,7 @@ namespace Sharlayan.Tests.Resources {
                 IReadOnlyList<HermesManifestCandidate> candidates = await new HermesV2ResourceProvider(
                     configuration,
                     new FakeTransport(new HermesHttpResponse(HttpStatusCode.NotModified, Array.Empty<byte>(), "\"v1\"")),
-                    "9.1.2").GetCandidatesAsync(CancellationToken.None);
+                    "9.2.0").GetCandidatesAsync(CancellationToken.None);
 
                 Assert.Equal(ResourceSource.Cache, candidates[0].Info.Source);
                 Assert.Equal(revision, candidates[0].Info.ResourceRevision);
@@ -130,7 +130,7 @@ namespace Sharlayan.Tests.Resources {
                     ResourceCacheDirectory = cacheDirectory,
                 };
 
-                IReadOnlyList<HermesManifestCandidate> candidates = await new HermesV2ResourceProvider(configuration, new ThrowingTransport(), "9.1.2").GetCandidatesAsync(CancellationToken.None);
+                IReadOnlyList<HermesManifestCandidate> candidates = await new HermesV2ResourceProvider(configuration, new ThrowingTransport(), "9.2.0").GetCandidatesAsync(CancellationToken.None);
 
                 Assert.Single(candidates);
                 Assert.Equal(ResourceSource.Embedded, candidates[0].Info.Source);
@@ -163,7 +163,7 @@ namespace Sharlayan.Tests.Resources {
                 schemaVersion = 2,
                 resourceRevision = revision,
                 manifest = "manifests/" + revision + ".json",
-                fcsCommit = "8ff04195c4e77ef0b85d15c6fd1c67785378f0fb",
+                fcsCommit = "ed2cd7049c4d84d9e2ccb3eb55245ea712b040f1",
                 publishedAt = "2026-07-22T00:00:00Z",
             }));
         }

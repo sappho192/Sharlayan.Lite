@@ -16,29 +16,29 @@ namespace Sharlayan.Tests.Resources {
         public void EmbeddedManifestParsesAndMatchesExpectedRevision() {
             byte[] bytes = ReadEmbeddedFixture();
 
-            HermesV2Manifest manifest = HermesV2ManifestParser.ParseManifest(bytes, null, "9.1.2", allowCandidate: true);
+            HermesV2Manifest manifest = HermesV2ManifestParser.ParseManifest(bytes, null, "9.2.0", allowCandidate: true);
 
             Assert.Equal(2, manifest.SchemaVersion);
-            Assert.Equal("8ff04195c4e77ef0b85d15c6fd1c67785378f0fb", manifest.Source.FcsCommit);
-            Assert.Equal("sha256:419248bf2ef93aa64e72723ea9e97d5503163178dab63e90a8155b359ebcf96d", HermesV2ManifestParser.CalculateRevision(bytes));
+            Assert.Equal("ed2cd7049c4d84d9e2ccb3eb55245ea712b040f1", manifest.Source.FcsCommit);
+            Assert.Equal("sha256:065e24246f0707101601d76fd23ce159d26f74f60c0368a589ef4da0a7abb701", HermesV2ManifestParser.CalculateRevision(bytes));
         }
 
         [Fact]
         public void RemoteParserAcceptsLiveVerifiedValidation() {
             byte[] bytes = ReadEmbeddedFixture();
 
-            HermesV2Manifest manifest = HermesV2ManifestParser.ParseManifest(bytes, null, "9.1.2", allowCandidate: false);
+            HermesV2Manifest manifest = HermesV2ManifestParser.ParseManifest(bytes, null, "9.2.0", allowCandidate: false);
 
             Assert.Equal("live-verified", manifest.Validation.Status);
-            Assert.Equal("3e27261f82851e1e88c413a25461e6ca0ad551e8", manifest.Validation.VerifierCommit);
+            Assert.Equal("36ebee4a4926dd45607bf973c6205b8eec04b480", manifest.Validation.VerifierCommit);
         }
 
         [Fact]
         public void ParserRejectsRevisionMismatchAndNewerMinimumVersion() {
             byte[] bytes = CreateLiveManifest("99.0.0");
 
-            Assert.Throws<InvalidDataException>(() => HermesV2ManifestParser.ParseManifest(bytes, "sha256:" + new string('0', 64), "9.1.2", allowCandidate: false));
-            Assert.Throws<InvalidDataException>(() => HermesV2ManifestParser.ParseManifest(bytes, null, "9.1.2", allowCandidate: false));
+            Assert.Throws<InvalidDataException>(() => HermesV2ManifestParser.ParseManifest(bytes, "sha256:" + new string('0', 64), "9.2.0", allowCandidate: false));
+            Assert.Throws<InvalidDataException>(() => HermesV2ManifestParser.ParseManifest(bytes, null, "9.2.0", allowCandidate: false));
         }
 
         [Fact]
@@ -46,7 +46,7 @@ namespace Sharlayan.Tests.Resources {
             byte[] trailing = Encoding.UTF8.GetBytes(Encoding.UTF8.GetString(ReadEmbeddedFixture()) + "{}");
             byte[] latest = Encoding.UTF8.GetBytes("{\"schemaVersion\":2,\"resourceRevision\":\"sha256:" + new string('a', 64) + "\",\"manifest\":\"../manifest.json\",\"fcsCommit\":\"" + new string('b', 40) + "\",\"publishedAt\":\"2026-07-22T00:00:00Z\"}");
 
-            Assert.Throws<InvalidDataException>(() => HermesV2ManifestParser.ParseManifest(trailing, null, "9.1.2", allowCandidate: true));
+            Assert.Throws<InvalidDataException>(() => HermesV2ManifestParser.ParseManifest(trailing, null, "9.2.0", allowCandidate: true));
             Assert.Throws<InvalidDataException>(() => HermesV2ManifestParser.ParseLatest(latest));
         }
 
@@ -55,17 +55,17 @@ namespace Sharlayan.Tests.Resources {
             JObject wrongType = JObject.Parse(Encoding.UTF8.GetString(ReadEmbeddedFixture()));
             wrongType["schemaVersion"] = "2";
             JObject invalidSemver = JObject.Parse(Encoding.UTF8.GetString(ReadEmbeddedFixture()));
-            invalidSemver["compatibility"]["minimumSharlayanVersion"] = "9.1.2+invalid!";
+            invalidSemver["compatibility"]["minimumSharlayanVersion"] = "9.2.0+invalid!";
 
             Assert.Throws<InvalidDataException>(() => HermesV2ManifestParser.ParseManifest(
                 Encoding.UTF8.GetBytes(wrongType.ToString(Newtonsoft.Json.Formatting.None)),
                 null,
-                "9.1.2",
+                "9.2.0",
                 allowCandidate: true));
             Assert.Throws<InvalidDataException>(() => HermesV2ManifestParser.ParseManifest(
                 Encoding.UTF8.GetBytes(invalidSemver.ToString(Newtonsoft.Json.Formatting.None)),
                 null,
-                "9.1.2",
+                "9.2.0",
                 allowCandidate: true));
         }
 
@@ -77,7 +77,7 @@ namespace Sharlayan.Tests.Resources {
             Assert.Throws<InvalidDataException>(() => HermesV2ManifestParser.ParseManifest(
                 Encoding.UTF8.GetBytes(json.ToString(Newtonsoft.Json.Formatting.None)),
                 null,
-                "9.1.2",
+                "9.2.0",
                 allowCandidate: true));
         }
 
@@ -91,12 +91,12 @@ namespace Sharlayan.Tests.Resources {
             Assert.Throws<InvalidDataException>(() => HermesV2ManifestParser.ParseManifest(
                 Encoding.UTF8.GetBytes(wrongLengthSource.ToString(Newtonsoft.Json.Formatting.None)),
                 null,
-                "9.1.2",
+                "9.2.0",
                 allowCandidate: true));
             Assert.Throws<InvalidDataException>(() => HermesV2ManifestParser.ParseManifest(
                 Encoding.UTF8.GetBytes(wrongCurrentType.ToString(Newtonsoft.Json.Formatting.None)),
                 null,
-                "9.1.2",
+                "9.2.0",
                 allowCandidate: true));
         }
 
@@ -107,12 +107,12 @@ namespace Sharlayan.Tests.Resources {
             byte[] bytes = Encoding.UTF8.GetBytes(json.ToString(Newtonsoft.Json.Formatting.None));
 
             Assert.Throws<InvalidDataException>(() =>
-                HermesV2ManifestParser.ParseManifest(bytes, null, "9.1.2", allowCandidate: true));
+                HermesV2ManifestParser.ParseManifest(bytes, null, "9.2.0", allowCandidate: true));
         }
 
         [Fact]
         public void MapperKeepsChatAndTalkOnOneManifest() {
-            HermesV2Manifest manifest = HermesV2ManifestParser.ParseManifest(ReadEmbeddedFixture(), null, "9.1.2", allowCandidate: true);
+            HermesV2Manifest manifest = HermesV2ManifestParser.ParseManifest(ReadEmbeddedFixture(), null, "9.2.0", allowCandidate: true);
 
             HermesMappedResources mapped = HermesV2ResourceMapper.Map(manifest);
 
@@ -194,9 +194,12 @@ namespace Sharlayan.Tests.Resources {
             Assert.Equal(1, mapped.BattleTalkLayout.TextIndex);
         }
 
-        internal static byte[] CreateLiveManifest(string minimumVersion = "9.1.2") {
+        internal static byte[] CreateLiveManifest(string minimumVersion = "9.2.0") {
             JObject json = JObject.Parse(Encoding.UTF8.GetString(ReadEmbeddedFixture()));
             json["compatibility"]["minimumSharlayanVersion"] = minimumVersion;
+            if (minimumVersion != "9.2.0") {
+                json["resources"]["battleTalk"].Parent.Remove();
+            }
             json["validation"] = new JObject {
                 ["status"] = "live-verified",
                 ["gameVersion"] = "7.51",
