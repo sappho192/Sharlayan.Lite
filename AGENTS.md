@@ -13,24 +13,27 @@ This file applies to the whole Sharlayan.Lite repository.
 
 ## Supported package baseline
 
-- Current source package version: `9.1.4`.
-- Latest published package version: `9.1.4`.
+- Current source package version: `9.2.1`.
+- Latest published package version: `9.2.0`.
 - Target frameworks: `net462;net48;net6.0;net7.0;net8.0;net10.0`.
-- File version: `9.1.4.0`.
+- File version: `9.2.1.0`.
 - Assembly version remains `8.0.0.0` for binary compatibility.
 - Current embedded Hermes revision:
   `sha256:419248bf2ef93aa64e72723ea9e97d5503163178dab63e90a8155b359ebcf96d`.
 
 ## Hermes v2 invariants
 
-- Resource priority is remote → verified cache → embedded.
-- Validate schema, compatibility, revision hash, validation metadata, and every required layout
+- Resource priority is remote → valid cache → embedded.
+- Validate schema, compatibility, revision hash, publication status, and every required layout
   before applying a manifest.
 - CHATLOG, LastTalk, and currentTalk must come from the same manifest revision and be applied
   atomically. Never mix remote signatures with embedded structures.
 - Freeze the selected revision for a handler lifetime. Do not hot-swap part of a running handler.
-- Embedded production bytes must match the live-verified Hermes immutable object exactly. Preserve
+- Embedded production bytes must match a Hermes immutable object exactly. Preserve
   LF/no-BOM rules and never embed a candidate.
+- Remote and cache manifests may be `generated` or `live-verified`. A generated manifest is accepted
+  only when its compatibility floor includes Sharlayan.Lite 9.2.1 or newer and it contains no live
+  verification metadata.
 - Remote failure must fall back to cache/embedded rather than fail handler construction.
 
 ## Talk semantics

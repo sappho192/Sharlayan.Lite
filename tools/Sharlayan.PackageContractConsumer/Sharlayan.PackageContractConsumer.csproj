@@ -4,7 +4,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <SharlayanPackageVersion Condition="'$(SharlayanPackageVersion)' == ''">9.2.0</SharlayanPackageVersion>
+    <SharlayanPackageVersion Condition="'$(SharlayanPackageVersion)' == ''">9.2.1</SharlayanPackageVersion>
   </PropertyGroup>
 
   <ItemGroup>

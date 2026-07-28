@@ -16,6 +16,43 @@ namespace Sharlayan.Tests.Resources {
 
     public sealed class HermesV2ResourceProviderTests {
         [Fact]
+        public async Task GeneratedRemoteManifestIsCachedAndUsedWhenNetworkFails() {
+            string cacheDirectory = Path.Combine(Path.GetTempPath(), "sharlayan-hermes-tests-" + Guid.NewGuid().ToString("N"));
+            try {
+                byte[] manifestBytes = HermesV2ManifestTests.CreateGeneratedManifest();
+                string revision = HermesV2ManifestParser.CalculateRevision(manifestBytes);
+                byte[] latestBytes = CreateLatest(revision);
+                FakeTransport transport = new FakeTransport(
+                    new HermesHttpResponse(HttpStatusCode.OK, latestBytes, "\"generated\""),
+                    new HermesHttpResponse(HttpStatusCode.OK, manifestBytes, null));
+                SharlayanConfiguration configuration = new SharlayanConfiguration {
+                    ResourceMode = ResourceMode.RemotePreferred,
+                    HermesV2LatestUri = new Uri("https://example.test/v2/latest.json"),
+                    ResourceCacheDirectory = cacheDirectory,
+                };
+
+                IReadOnlyList<HermesManifestCandidate> remote = await new HermesV2ResourceProvider(
+                    configuration,
+                    transport,
+                    "9.2.1").GetCandidatesAsync(CancellationToken.None);
+                IReadOnlyList<HermesManifestCandidate> fallback = await new HermesV2ResourceProvider(
+                    configuration,
+                    new ThrowingTransport(),
+                    "9.2.1").GetCandidatesAsync(CancellationToken.None);
+
+                Assert.Equal(ResourceSource.Remote, remote[0].Info.Source);
+                Assert.Equal("generated", remote[0].Info.ValidationStatus);
+                Assert.Equal(revision, remote[0].Info.ResourceRevision);
+                Assert.Equal(ResourceSource.Cache, fallback[0].Info.Source);
+                Assert.Equal("generated", fallback[0].Info.ValidationStatus);
+                Assert.Equal(revision, fallback[0].Info.ResourceRevision);
+            }
+            finally {
+                if (Directory.Exists(cacheDirectory)) Directory.Delete(cacheDirectory, recursive: true);
+            }
+        }
+
+        [Fact]
         public async Task RemoteManifestIsCachedAndUsedWhenNetworkFails() {
             string cacheDirectory = Path.Combine(Path.GetTempPath(), "sharlayan-hermes-tests-" + Guid.NewGuid().ToString("N"));
             try {
@@ -87,7 +124,7 @@ namespace Sharlayan.Tests.Resources {
         }
 
         [Fact]
-        public async Task NotModifiedLatestUsesVerifiedCache() {
+        public async Task NotModifiedLatestUsesValidCache() {
             string cacheDirectory = Path.Combine(Path.GetTempPath(), "sharlayan-hermes-tests-" + Guid.NewGuid().ToString("N"));
             try {
                 byte[] manifestBytes = HermesV2ManifestTests.CreateLiveManifest();
