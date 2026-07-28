@@ -280,7 +280,7 @@ namespace Sharlayan.Resources {
 
             JObject validation = RequireObject(root, "validation", "$.");
             string status = RequireString(validation, "status", "$.validation.");
-            if (status == "candidate") {
+            if (status == "candidate" || status == "generated") {
                 ValidateObject(validation, "$.validation", "status");
             }
             else {
@@ -481,7 +481,7 @@ namespace Sharlayan.Resources {
 
             HermesBattleTalkResource battleTalk = manifest.Resources.BattleTalk;
             if (battleTalk != null) {
-                if (manifest.Compatibility.MinimumSharlayanVersion != "9.2.0"
+                if (CompareSemanticVersions(manifest.Compatibility.MinimumSharlayanVersion, "9.2.0") < 0
                     || battleTalk.Root != "framework"
                     || battleTalk.Semantics != "currentBattleTalk"
                     || battleTalk.AddonName != "_BattleTalk"
@@ -543,8 +543,18 @@ namespace Sharlayan.Resources {
                     throw new InvalidDataException("Live verification metadata is incomplete.");
                 }
             }
+            else if (validation.Status == "generated") {
+                if (CompareSemanticVersions(manifest.Compatibility.MinimumSharlayanVersion, "9.2.1") < 0) {
+                    throw new InvalidDataException("Generated manifests require Sharlayan.Lite 9.2.1 or newer.");
+                }
+                if (!string.IsNullOrEmpty(validation.GameVersion)
+                    || !string.IsNullOrEmpty(validation.ExecutableSha256)
+                    || !string.IsNullOrEmpty(validation.VerifierCommit)) {
+                    throw new InvalidDataException("Generated manifests must not contain live verification metadata.");
+                }
+            }
             else if (!(allowCandidate && validation.Status == "candidate")) {
-                throw new InvalidDataException("Only live-verified remote and cache manifests are accepted.");
+                throw new InvalidDataException("Only generated or live-verified remote and cache manifests are accepted.");
             }
         }
 

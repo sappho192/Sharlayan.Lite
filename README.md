@@ -12,9 +12,9 @@ Supported targets: .NET Framework 4.6.2 and 4.8, plus .NET 6, 7, 8, and 10.
 
 # How do I use it and what comes back?
 
-- .NET CLI: `dotnet add package Sharlayan.Lite --version 9.2.0`
-- Nuget Package Manager: `Install-Package Sharlayan.Lite -Version 9.2.0`
-- PackageReference: `<PackageReference Include="Sharlayan.Lite" Version="9.2.0" />`
+- .NET CLI: `dotnet add package Sharlayan.Lite --version 9.2.1`
+- Nuget Package Manager: `Install-Package Sharlayan.Lite -Version 9.2.1`
+- PackageReference: `<PackageReference Include="Sharlayan.Lite" Version="9.2.1" />`
 
 That's the basic of it. For actual instantiation it works as follows:
 
@@ -47,8 +47,9 @@ if (processes.Length > 0)
 
 `ResourceMode` defaults to `EmbeddedOnly`, so existing consumers do not start network requests merely by
 updating the package. `RemotePreferred` validates Hermes v2 remote bytes first, then falls back to the last
-verified cache and finally the package's embedded manifest. Initialization uses one manifest revision for
-both the CHATLOG signature/structure and standard Talk offsets.
+valid cache and finally the package's embedded manifest. Remote and cached manifests may use the
+`generated` status for CI-published resources or the legacy `live-verified` status. Initialization
+uses one manifest revision for both the CHATLOG signature/structure and standard Talk offsets.
 The default latest pointer is `https://hermes.sapphosound.com/v2/latest.json`, under the Hermes v2 public
 base `https://hermes.sapphosound.com/v2/`.
 

@@ -34,6 +34,42 @@ namespace Sharlayan.Tests.Resources {
         }
 
         [Fact]
+        public void RemoteParserAcceptsGeneratedValidationWithoutLiveMetadata() {
+            byte[] bytes = CreateGeneratedManifest();
+
+            HermesV2Manifest manifest = HermesV2ManifestParser.ParseManifest(bytes, null, "9.2.1", allowCandidate: false);
+
+            Assert.Equal("generated", manifest.Validation.Status);
+            Assert.Null(manifest.Validation.GameVersion);
+            Assert.Null(manifest.Validation.ExecutableSha256);
+            Assert.Null(manifest.Validation.VerifierCommit);
+        }
+
+        [Fact]
+        public void GeneratedManifestRequiresCompatibleClientAndRejectsLiveMetadata() {
+            byte[] bytes = CreateGeneratedManifest();
+            JObject withLiveMetadata = JObject.Parse(Encoding.UTF8.GetString(bytes));
+            withLiveMetadata["validation"]["gameVersion"] = "2026.07.16.0001.0000";
+            JObject withOlderFloor = JObject.Parse(Encoding.UTF8.GetString(bytes));
+            withOlderFloor["compatibility"]["minimumSharlayanVersion"] = "9.2.0";
+
+            Assert.Throws<InvalidDataException>(() =>
+                HermesV2ManifestParser.ParseManifest(bytes, null, "9.2.0", allowCandidate: false));
+            Assert.Throws<InvalidDataException>(() =>
+                HermesV2ManifestParser.ParseManifest(
+                    Encoding.UTF8.GetBytes(withOlderFloor.ToString(Newtonsoft.Json.Formatting.None)),
+                    null,
+                    "9.2.1",
+                    allowCandidate: false));
+            Assert.Throws<InvalidDataException>(() =>
+                HermesV2ManifestParser.ParseManifest(
+                    Encoding.UTF8.GetBytes(withLiveMetadata.ToString(Newtonsoft.Json.Formatting.None)),
+                    null,
+                    "9.2.1",
+                    allowCandidate: false));
+        }
+
+        [Fact]
         public void ParserRejectsRevisionMismatchAndNewerMinimumVersion() {
             byte[] bytes = CreateLiveManifest("99.0.0");
 
@@ -205,6 +241,15 @@ namespace Sharlayan.Tests.Resources {
                 ["gameVersion"] = "7.51",
                 ["executableSha256"] = new string('c', 64),
                 ["verifierCommit"] = new string('d', 40),
+            };
+            return new UTF8Encoding(false).GetBytes(json.ToString(Newtonsoft.Json.Formatting.Indented) + "\n");
+        }
+
+        internal static byte[] CreateGeneratedManifest() {
+            JObject json = JObject.Parse(Encoding.UTF8.GetString(ReadEmbeddedFixture()));
+            json["compatibility"]["minimumSharlayanVersion"] = "9.2.1";
+            json["validation"] = new JObject {
+                ["status"] = "generated",
             };
             return new UTF8Encoding(false).GetBytes(json.ToString(Newtonsoft.Json.Formatting.Indented) + "\n");
         }

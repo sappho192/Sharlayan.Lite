@@ -96,7 +96,7 @@ namespace Sharlayan.Resources {
                     HermesV2Manifest cached = HermesV2ManifestParser.ParseManifest(cachedManifest, latest.ResourceRevision, this._clientVersion, allowCandidate: false);
                     EnsureLatestMatchesManifest(latest, cached);
                     this._cache.WriteLatest(latestBytes, latestEtag);
-                    return CreateCandidate(cached, cachedManifest, ResourceSource.Cache, latest.ResourceRevision, "Remote latest selected an existing verified cache entry.");
+                    return CreateCandidate(cached, cachedManifest, ResourceSource.Cache, latest.ResourceRevision, "Remote latest selected an existing valid cache entry.");
                 }
                 catch {
                     this._cache.QuarantineManifest(latest.ResourceRevision);
