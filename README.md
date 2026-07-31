@@ -1,8 +1,20 @@
 # Sharlayan.Lite
 
-This fork is a lightweight version of the original library with memory search, ChatLog, and dialogue UI readers.
+This fork is a lightweight, independently maintained version of the original library with memory search, ChatLog, and dialogue UI readers.
 
 Supported targets: .NET Framework 4.6.2 and 4.8, plus .NET 6, 7, 8, and 10.
+
+## Project status and upstream compatibility
+
+Sharlayan.Lite no longer tracks or ports implementation changes from the original
+[`FFXIVAPP/sharlayan`](https://github.com/FFXIVAPP/sharlayan) repository. It has deliberately
+diverged around a smaller feature set and its own resource and dialogue-reading implementations.
+
+Do not treat Sharlayan.Lite as a drop-in replacement for a current version of the original
+Sharlayan package. Compatibility with the latest upstream public API, behavior, data models, or
+implementation is not a project goal and is not guaranteed. Consumers should assume the two
+libraries are incompatible unless the exact APIs and behavior they rely on have been verified.
+Their package version numbers are independent and do not identify equivalent releases.
 
 # Nuget Package list
 
